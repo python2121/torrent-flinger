@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Torrent Flinger
+Comment=Remote viewer and administrator for a Transmission server
+Exec=torrent-flinger %u
+Icon=io.github.python2121.TorrentFlinger
+Terminal=false
+Categories=Network;P2P;Qt;
+MimeType=x-scheme-handler/magnet;application/x-bittorrent;
+StartupNotify=false

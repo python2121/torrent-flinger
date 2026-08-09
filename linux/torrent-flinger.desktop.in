@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Torrent Flinger
+Comment=Send magnet links and torrents to a remote Transmission server
+Exec=@ROOT@/bin/torrent-flinger %u
+Icon=@ROOT@/flinger/assets/icon128.png
+Terminal=false
+Categories=Network;P2P;Qt;
+MimeType=x-scheme-handler/magnet;application/x-bittorrent;
+StartupNotify=false
+X-GNOME-UsesNotifications=true

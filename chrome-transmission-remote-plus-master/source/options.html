@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>Remote Transmission Options</title>
+	<link rel="stylesheet" type="text/css" href="css/options.css" />
+	<script type="text/javascript" src="js/jquery-3.2.1.min.js"></script>
+	<script type="text/javascript" src="js/options.js"></script>
+</head>
+
+<body>
+
+<div id="container">
+	<fieldset>
+		<legend>Server</legend>
+		<ul>
+			<li>
+				<label class="section" for="ip">Address</label>
+				<select id="protocol">
+					<option>http</option>
+					<option>https</option>
+				</select> ://
+				<input id="ip" type="text" /> :
+				<input id="port" type="text" maxlength="5" /> /
+				<input id="path" type="text" /> /
+				<div class="clear"></div>
+			</li>
+			<li>
+				<label class="section" for="rpcPath">RPC Path</label>
+				<input id="rpcPath" type="text" />
+				<div class="clear"></div>
+			</li>
+			<li>
+				<label class="section" for="webPath">Web Path</label>
+				<input id="webPath" type="text" />
+				<div class="clear"></div>
+			</li>
+			<li><br /></li>
+			<li>
+				<label class="section" for="user">Username</label>
+				<input id="user" type="password" />
+				<div class="clear"></div>
+			</li>
+			<li>
+				<label class="section" for="pass">Password</label>
+				<input id="pass" type="password" />
+				<div class="clear"></div>
+			</li>
+		</ul>
+	</fieldset>
+	<fieldset>
+		<legend>General</legend>
+		<ul>
+			<li>
+				<label class="section" for="notificationstorrentfinished">
+					Desktop Notification<br />
+					<span class="small">(when a torrent finishes)</span>
+				</label>
+				<input id="notificationstorrentfinished" type="checkbox" />
+				<div class="clear"></div>
+			</li>
+			<li>
+				<label class="section" for="notificationsnewtorrent">
+					Desktop Notification<br />
+					<span class="small">(when adding new torrents)</span>
+				</label>
+				<input id="notificationsnewtorrent" type="checkbox" />
+				<div class="clear"></div>
+			</li>
+			<li>
+				<label class="section" for="browserbadgetimeout">
+					Icon Notification Timeout<br />
+					<span class="small">(how long add/dup/fail is shown)</span>
+				</label>
+				<select id="browserbadgetimeout">
+					<option value="100">100ms</option>
+					<option value="250">250ms</option>
+					<option value="500">500ms</option>
+					<option value="1000">1s</option>
+					<option value="2000">2s</option>
+					<option value="5000">5s</option>
+					<option value="10000">10s</option>
+				</select>
+				<div class="clear"></div>
+			</li>
+			<li>
+				<label class="section" for="popuprefreshinterval">
+					Popup Refresh Interval<br />
+					<span class="small">(how often the popup is refreshed)</span>
+				</label>
+				<select id="popuprefreshinterval">
+					<option value="100">100ms</option>
+					<option value="1000">1s</option>
+					<option value="3000">3s</option>
+					<option value="10000">10s</option>
+					<option value="30000">30s</option>
+				</select>
+				<div class="clear"></div>
+			</li>
+		</ul>
+	</fieldset>
+	<fieldset>
+		<legend>Download</legend>
+		<ul>
+			<li>
+				<fieldset>
+					<legend>Defaults</legend>
+					<div class="options">
+						<input id="start_paused" name="start_paused" type="checkbox" />
+						<label for="start_paused">Add torrent in Paused state</label><br />
+					</div>
+					<div class="clear"></div>
+				</fieldset>
+			</li>
+			<li>
+				<fieldset>
+					<legend>Default Click Action</legend>
+					<div class="options">
+						<input id="dlremote" name="clickaction" type="radio" value="dlremote"/>
+						<label for="dlremote">Download the torrent file with the remote Transmission server</label><br />
+						<span class="small" style="padding-left: 17px;">(to download locally, right-click and select "Save Link As...")</span><br />
+						<input id="dllocal" name="clickaction" type="radio" value="dllocal"/>
+						<label for="dllocal">Download the torrent file locally</label><br />
+						<span class="small" style="padding-left: 17px;">(to download using the remote Transmission server, right-click and select "Download with Remote Transmission")</span>
+					</div>
+					<div class="clear"></div>
+				</fieldset>
+			</li>
+			<li>
+				<fieldset>
+					<legend>Location</legend>
+					<div class="options">
+						<input id="dlpopup" type="checkbox" />
+						<label for="dlpopup">Show download popup</label><br><br>
+						<label><b>Custom Directories</b><br>Add custom directories below. These custom directories will show up in the download popup.</label>
+						<table id="customdirs">
+							<tr>
+								<th>Label</th>
+								<th>Directory</th>
+								<th>&nbsp;</th>
+							</tr>
+							<tr class="addcustom">
+								<td><input id="customlabel" class="label" type="text" /></td>
+								<td><input id="customdir" class="dir" type="text" /></td>
+								<td>
+									<button id="adddir">Add</button>
+								</td>
+							</tr>
+						</table>
+					</div>
+					<div class="clear"></div>
+				</fieldset>
+			</li>
+		</ul>
+	</fieldset>
+	<button id="save">Save</button> <span id="saved">Settings saved.</span>
+</div>
+</body>
+</html>

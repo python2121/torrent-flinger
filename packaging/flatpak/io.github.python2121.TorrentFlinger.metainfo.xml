@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.python2121.TorrentFlinger</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>Apache-2.0</project_license>
+  <name>Torrent Flinger</name>
+  <summary>Fling torrents to a remote Transmission server</summary>
+  <description>
+    <p>
+      A system-tray remote for a Transmission server. Click a magnet link or a
+      .torrent file in any browser and it is sent straight to your server — no
+      browser extension required. The tray popup shows your torrents with live
+      progress and lets you pause, resume, remove, filter, and administer the
+      server: speed limits, turtle mode, download directories, and more.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.python2121.TorrentFlinger.desktop</launchable>
+  <categories>
+    <category>Network</category>
+    <category>P2P</category>
+  </categories>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.1.0" date="2026-08-08"/>
+  </releases>
+</component>

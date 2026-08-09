@@ -1,0 +1,320 @@
+body {
+	margin: 0;
+	width: 525px;
+	padding: 4px;
+	color: #222;
+	font: 13px Verdana, Arial, Helvetica, sans-serif;
+	cursor: default;
+	-khtml-user-select: none;
+}
+
+input, select {
+	border: 1px solid #555;
+	border-radius: 1px;
+	background: #f6f6f6;
+	color: #222;
+	font: 13px Verdana, Arial, Helvetica, sans-serif;
+}
+
+input[type="text"] {
+	cursor: auto;
+	-khtml-user-select: auto;
+}
+
+#header {
+	position: relative;
+	height: 40px;
+	background: url(../images/icon128.png) no-repeat;
+	font-size: 11px;
+}
+
+#global_stats {
+	position: absolute;
+	left: 110px;
+	bottom: 1px;
+}
+
+#global_speeds {
+	position: absolute;
+	right: 5px;
+	bottom: 1px;
+	text-align: right;
+}
+
+#bar {
+	height: 22px;
+	border: 1px solid #555;
+	border-top-left-radius: 3px;
+	border-top-right-radius: 3px;
+	background: url(../images/chrome.png) repeat-x 0 -66px;
+	padding: 0 5px;
+	line-height: 22px;
+}
+
+#menu_button {
+	display: inline-block;
+	width: 32px;
+	height: 22px;
+	background: url(../images/chrome.png) no-repeat 0 0;
+}
+
+#menu_button.on {
+	background-position: -32px 0;
+}
+
+#menu {
+	display: none;
+	position: fixed;
+	top: 65px;
+	left: 10px;
+	margin: 0;
+	min-width: 150px;
+	-webkit-box-shadow: rgba(0, 0, 0, 0.3) 3px 3px 6px;
+	border: 1px solid #555;
+	border-radius: 3px;
+	background: #fff;
+	padding: 10px 1px 1px 1px;
+	list-style-type: none;
+}
+
+#menu li {
+	padding: 1px 5px;
+	font-size: 0.9em;
+	color: #000;
+}
+
+#menu li:hover {
+	background: #3a93db;
+	color: #fff;
+	cursor: default;
+}
+
+#turtle_button {
+	display: inline-block;
+	width: 32px;
+	height: 22px;
+	background: url(../images/chrome.png) no-repeat 0 -22px;
+}
+
+#turtle_button:active {
+	background-position: -32px -22px;
+}
+
+#turtle_button.on {
+	background-position: 0 -44px;
+}
+
+#turtle_button.on:active {
+	background-position: -32px -44px;
+}
+
+#filter_type {
+	float: right;
+	height: 18px;
+	margin: 2px 0 0 0;
+}
+
+#filter {
+	float: right;
+	position: relative;
+	margin-left: 4px;
+}
+
+#filter_input {
+	display: inline-block;
+	height: 14px;
+	padding-right: 19px;
+	margin: 0;
+}
+
+#filter_clear {
+	display: none;
+	position: absolute;
+	right: 3px;
+	top: 5px;
+	width: 14px;
+	height: 12px;
+	background: url(../images/buttons.png) no-repeat -28px 0;
+}
+
+#filter_clear:hover {
+	background-position: -28px -12px;
+}
+
+#filter_clear:active {
+	background-position: -28px -24px;
+}
+
+#status {
+	display: none;
+	margin: 0;
+	line-height: 48px;
+	text-align: center;
+	vertical-align: middle;
+}
+
+#list_hidden {
+	display: none;
+}
+
+#list_wrapper {
+	overflow: auto;
+	max-height: 527px;
+	min-height: 45px;
+}
+
+#list {
+	min-height: 100%;
+	margin: 0;
+	padding: 0;
+	border: 1px solid #555;
+	border-top: 0;
+	border-bottom-left-radius: 3px;
+	border-bottom-right-radius: 3px;
+	list-style-type: none;
+}
+
+#list li {
+	position: relative;
+	border-bottom: 1px solid #ccc;
+	padding: 2px 7px 4px 5px;
+	background-color: #fff;
+	line-height: 14px;
+	white-space: nowrap;
+}
+
+#list li:nth-child(2n) {
+	background-color: #edf3fe;
+}
+
+#list li:last-child {
+	border-bottom: 0;
+}
+
+.torrent_name {
+	overflow: hidden;
+	font-size: 10px;
+	font-weight: bold;
+}
+
+.torrent_stats {
+	display: inline-block;
+	font-size: 9px;
+	color: #666;
+	min-height: 10pt;
+}
+
+.torrent_speeds {
+	display: inline-block;
+	position: absolute;
+	right: 5px;
+	font-size: 9px;
+	color: #666;
+}
+
+.torrent_progress {
+	width: 100%;
+	height: 10px;
+	border: 1px solid #c8cacd;
+	background: url(../images/progress.png) repeat-x 0 -20px;
+}
+
+.magnetizing {
+	border-color: #cc6068;
+	background-position: 0 -50px;
+}
+
+.torrent_progress div {
+	position: relative;
+	top: -1px;
+	left: -1px;
+	-webkit-transition: width 1.0s;
+	height: 10px;
+	border-style: solid;
+	background-image: url(../images/progress.png);
+	background-repeat: repeat-x;
+}
+
+.torrent_progress div.downloading {
+	border-width: 1px 0 1px 1px;
+	border-color: #3f79ee;
+	background-position: 0 0;
+}
+
+.torrent_progress div.paused {
+	border-width: 1px 0 1px 1px;
+	border-color: #939393;
+	background-position: 0 -30px;
+}
+
+.torrent_progress div.seeding {
+	border-width: 1px;
+	border-color: #29ad35;
+	background-position: 0 -10px;
+}
+
+.torrent_progress div.complete {
+	border-width: 1px;
+	border-color: #269e30;
+	background-position: 0 -40px;
+}
+
+.torrent_button {
+	position: absolute;
+	top: 32px;
+	width: 14px;
+	height: 12px;
+	background: url(../images/buttons.png) no-repeat;
+}
+
+.pause {
+	right: 19px;
+	background-position: 0 0;
+}
+
+.pause:hover {
+	background-position: 0 -12px;
+}
+
+.pause:active {
+	background-position: 0 -24px;
+}
+
+.resume {
+	right: 19px;
+	background-position: -14px 0;
+}
+
+.resume:hover {
+	background-position: -14px -12px;
+}
+
+.resume:active {
+	background-position: -14px -24px;
+}
+
+.remove {
+	right: 5px;
+	background-position: -28px 0;
+}
+
+.remove:hover {
+	background-position: -28px -12px;
+}
+
+.remove:active {
+	background-position: -28px -24px;
+}
+
+.remove_data {
+	right: 5px;
+	background-position: -42px 0;
+}
+
+.remove_data:hover {
+	background-position: -42px -12px;
+}
+
+.remove_data:active {
+	background-position: -42px -24px;
+}

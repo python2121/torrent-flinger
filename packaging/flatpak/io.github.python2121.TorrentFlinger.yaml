@@ -1,0 +1,37 @@
+app-id: io.github.python2121.TorrentFlinger
+runtime: org.kde.Platform
+runtime-version: '6.11'
+sdk: org.kde.Sdk
+base: io.qt.PySide.BaseApp
+base-version: '6.11'
+command: torrent-flinger
+finish-args:
+  - --share=network
+  - --share=ipc
+  - --socket=wayland
+  # x11 (not fallback-x11): the popup runs through XWayland by choice, because
+  # Wayland toplevels can't self-position next to the tray icon
+  - --socket=x11
+  # tray icon (StatusNotifier) + desktop notifications
+  - --talk-name=org.kde.StatusNotifierWatcher
+  - --talk-name=org.freedesktop.Notifications
+cleanup-commands:
+  - /app/cleanup-BaseApp.sh
+modules:
+  - name: torrent-flinger
+    buildsystem: simple
+    build-commands:
+      - install -d /app/share/torrent-flinger
+      - cp -r flinger /app/share/torrent-flinger/
+      - install -Dm755 packaging/flatpak/torrent-flinger.sh /app/bin/torrent-flinger
+      - install -Dm644 packaging/flatpak/io.github.python2121.TorrentFlinger.desktop
+        /app/share/applications/io.github.python2121.TorrentFlinger.desktop
+      - install -Dm644 flinger/assets/icon128.png
+        /app/share/icons/hicolor/128x128/apps/io.github.python2121.TorrentFlinger.png
+      - install -Dm644 flinger/assets/icon48.png
+        /app/share/icons/hicolor/48x48/apps/io.github.python2121.TorrentFlinger.png
+      - install -Dm644 packaging/flatpak/io.github.python2121.TorrentFlinger.metainfo.xml
+        /app/share/metainfo/io.github.python2121.TorrentFlinger.metainfo.xml
+    sources:
+      - type: dir
+        path: ../..
