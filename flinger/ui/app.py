@@ -10,7 +10,7 @@ from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 from ..core.config import Config
-from ..core.formats import fmt_speed, link_display_name
+from ..core.formats import common_remote_root, fmt_speed, link_display_name
 from ..core.transmission import TransmissionClient, TransmissionError
 from .add_dialog import AddDialog
 from .options_dialog import OptionsDialog
@@ -42,6 +42,17 @@ class FlingerApp(QObject):
         self.popup.remove_clicked.connect(
             lambda tid, data: self._action(lambda: self.client.remove([tid], data)))
         self.popup.details_requested.connect(self._open_details)
+        self.popup.pause_many.connect(
+            lambda ids: self._action(lambda: self.client.stop(list(ids))))
+        self.popup.resume_many.connect(
+            lambda ids: self._action(lambda: self.client.start(list(ids))))
+        self.popup.verify_many.connect(
+            lambda ids: self._action(lambda: self.client.verify(list(ids))))
+        self.popup.reannounce_many.connect(
+            lambda ids: self._action(lambda: self.client.reannounce(list(ids))))
+        self.popup.remove_many.connect(
+            lambda ids, delete: self._action(
+                lambda: self.client.remove(list(ids), delete)))
         self.popup.add_link.connect(self.handle_link)
         self.popup.add_file_requested.connect(self.add_torrent_file)
         self.popup.open_web_requested.connect(lambda: webbrowser.open(self.config.web_url))
@@ -122,6 +133,16 @@ class FlingerApp(QObject):
         torrents = data["torrents"]
         stats = data["stats"]
         turtle = bool(data["session"].get("alt-speed-enabled"))
+        # remote prefix for path mapping: explicit setting, else the common
+        # root of the default download dir and all custom dirs (so torrents
+        # in /data/complete and /data/tv both map through /data)
+        prefix = self.config.mount_remote
+        if not prefix:
+            candidates = [data["session"].get("download-dir", "")]
+            candidates += [d.get("dir", "") for d in self.config.custom_dirs]
+            prefix = (common_remote_root(candidates)
+                      or data["session"].get("download-dir", ""))
+        self.popup.set_path_mapping(prefix, self.config.mount_local)
         self.popup.set_data(torrents, stats, turtle,
                             free_space=data.get("free_space", -1),
                             server=self.config.host)

@@ -121,6 +121,108 @@ class PopupTest(unittest.TestCase):
         popup._maybe_offer_clip()  # same text now dismissed → no banner
         self.assertTrue(popup.clip_banner.isHidden())
 
+    def test_selection_semantics(self):
+        popup, _ = self.make_popup()
+        order = popup._visual_order()
+        self.assertEqual(len(order), 4)
+        # plain click selects only that row
+        popup._on_row_clicked(order[0], Qt.NoModifier)
+        self.assertEqual(popup.selected_ids(), [order[0]])
+        self.assertTrue(popup._rows[order[0]].is_selected)
+        # ctrl-click toggles another into the selection
+        popup._on_row_clicked(order[2], Qt.ControlModifier)
+        self.assertEqual(set(popup.selected_ids()), {order[0], order[2]})
+        # shift-click ranges from the last anchor (order[2]) to the end
+        popup._on_row_clicked(order[3], Qt.ShiftModifier)
+        self.assertEqual(set(popup.selected_ids()), {order[2], order[3]})
+        # plain click collapses back to a single selection
+        popup._on_row_clicked(order[1], Qt.NoModifier)
+        self.assertEqual(popup.selected_ids(), [order[1]])
+
+    def test_body_click_selects_not_expands(self):
+        popup, _ = self.make_popup()
+        popup.show()
+        row = popup._rows[1]
+        QTest.mousePress(row, Qt.LeftButton, Qt.NoModifier,
+                         row._header_widget.geometry().center())
+        QTest.mouseRelease(row, Qt.LeftButton, Qt.NoModifier,
+                           row._header_widget.geometry().center())
+        self.assertEqual(row.body.maximumHeight(), 0)     # did not expand
+        self.assertTrue(row.is_selected)                  # did select
+        # chevron still expands
+        row.chevron.click()
+        self.assertTrue(wait_until(lambda: row.body.maximumHeight() > 0))
+        popup.hide()
+
+    def test_context_menu_contents(self):
+        popup, _ = self.make_popup()
+        popup._on_row_clicked(1, Qt.NoModifier)
+        single = [a.text() for a in popup._build_context_menu([1]).actions()
+                  if a.text()]
+        self.assertIn("Details…", single)
+        self.assertIn("Resume", single)
+        self.assertIn("Remove…", single)
+        multi = [a.text() for a in popup._build_context_menu([1, 2, 3]).actions()
+                 if a.text()]
+        self.assertIn("Pause (3)", multi)
+        self.assertIn("Copy magnet links", multi)
+        self.assertNotIn("Details…", multi)
+        # right-click on an unselected row reselects to just that row
+        popup._on_row_context = popup._on_row_context  # (exec not called in tests)
+        got = []
+        popup.remove_many.connect(lambda ids, d: got.append((list(ids), d)))
+        popup.remove_many.emit([1, 2], True)
+        self.assertEqual(got, [([1, 2], True)])
+
+    def test_reveal_in_dolphin_entry(self):
+        popup, _ = self.make_popup()   # rows have downloadDir "/data"
+        popup._exists = lambda path: path.startswith("/run/media/nas")
+        # no mapping configured → no reveal entry
+        actions = [a.text() for a in popup._build_context_menu([1]).actions()]
+        self.assertNotIn("Reveal in Dolphin", actions)
+        popup.set_path_mapping("/data", "/run/media/nas")
+        actions = [a.text() for a in popup._build_context_menu([1]).actions()]
+        self.assertIn("Reveal in Dolphin", actions)
+        self.assertEqual(popup._local_path_for(1), "/run/media/nas")
+        # multi-selection → no reveal entry
+        actions = [a.text() for a in popup._build_context_menu([1, 2]).actions()]
+        self.assertNotIn("Reveal in Dolphin", actions)
+        # local mount missing entirely → entry hidden even with mapping set
+        popup._exists = lambda path: False
+        actions = [a.text() for a in popup._build_context_menu([1]).actions()]
+        self.assertNotIn("Reveal in Dolphin", actions)
+
+    def test_add_dir_dialog(self):
+        from flinger.ui.options_dialog import AddDirDialog
+        dialog = AddDirDialog()
+        self.assertFalse(dialog._save_btn.isEnabled())     # empty dir → no Save
+        dialog.dir_edit.setText("/data/movies")
+        self.assertTrue(dialog._save_btn.isEnabled())
+        dialog.label_edit.setText("Movies")
+        self.assertEqual(dialog.dir_edit.text(), "/data/movies")
+
+    def test_options_roundtrip_mount(self):
+        from flinger.core.config import Config
+        from flinger.ui.options_dialog import OptionsDialog
+        cfg = Config(mount_remote="/data", mount_local="/mnt/nas",
+                     last_download_dir="/data/tv")
+        dialog = OptionsDialog(cfg)
+        out = dialog.to_config()
+        self.assertEqual(out.mount_remote, "/data")
+        self.assertEqual(out.mount_local, "/mnt/nas")
+        self.assertEqual(out.last_download_dir, "/data/tv")  # carried through
+
+    def test_action_button_modes(self):
+        popup, _ = self.make_popup()
+        rows = popup._rows
+        self.assertEqual(rows[1].toggle_btn.text(), "Pause")    # downloading 40%
+        self.assertEqual(rows[2].toggle_btn.text(), "Remove")   # seeding, 100%
+        self.assertEqual(rows[3].toggle_btn.text(), "Remove")   # finished
+        self.assertEqual(rows[4].toggle_btn.text(), "Resume")   # paused at 20%
+        self.assertEqual(rows[1].toggle_btn.styleSheet(), "")           # plain
+        self.assertIn("27ae60", rows[4].toggle_btn.styleSheet())        # green outline
+        self.assertIn("da4453", rows[2].toggle_btn.styleSheet())        # red outline
+
     def test_row_subtitle_content(self):
         popup, _ = self.make_popup()
         self.assertIn("↓ 1.2 MB/s", popup._rows[1].subtitle_label.text())
@@ -167,20 +269,22 @@ class DetailsDialogTest(unittest.TestCase):
         from flinger.ui.add_dialog import AddDialog
         cfg = Config(custom_dirs=[{"label": "TV", "dir": "/data/tv"}])
         dialog = AddDialog(cfg, "Some.Torrent")
-        # extension ordering: Default, New Directory…, then customs
+        # Default first, then customs only — no "New Directory" entry
         self.assertEqual(dialog.location.itemText(0), "< Default Directory >")
-        self.assertEqual(dialog.location.itemData(1), "__new__")
-        self.assertEqual(dialog.location.itemData(2), "/data/tv")
-        # server default prefills the New Directory field with trailing slash
-        dialog.set_server_default("/data/downloads")
+        self.assertEqual(dialog.location.itemData(1), "/data/tv")
+        self.assertEqual(dialog.location.count(), 2)
         dialog.location.setCurrentIndex(1)
-        self.assertEqual(dialog.new_dir.text(), "/data/downloads/")
-        # no label → basename becomes the label
-        dialog.new_dir.setText("/data/movies")
-        dialog.remember.setChecked(True)
         directory, _paused = dialog.result_options()
-        self.assertEqual(directory, "/data/movies")
-        self.assertEqual(cfg.custom_dirs[-1], {"label": "movies", "dir": "/data/movies"})
+        self.assertEqual(directory, "/data/tv")
+
+    def test_add_dialog_preselects_last_dir(self):
+        from flinger.core.config import Config
+        from flinger.ui.add_dialog import AddDialog
+        cfg = Config(custom_dirs=[{"label": "TV", "dir": "/data/tv"},
+                                  {"label": "Books", "dir": "/data/books"}],
+                     last_download_dir="/data/books")
+        dialog = AddDialog(cfg, "Some.Torrent")
+        self.assertEqual(dialog.location.currentData(), "/data/books")
 
 
 class AppIntegrationTest(unittest.TestCase):

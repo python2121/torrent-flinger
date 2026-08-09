@@ -31,7 +31,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..core.formats import fmt_eta, fmt_size, fmt_speed, status_name
-from .style import argb, small_font, state_color, state_pixmap, torrent_state
+from .style import NEGATIVE, POSITIVE, argb, small_font, state_color, state_pixmap, torrent_state
 
 ROW_HEIGHT = 44
 EXPAND_MS = 100
@@ -46,13 +46,17 @@ class TorrentRow(QWidget):
     remove_clicked = Signal(int, bool)
     details_requested = Signal(int)
     notify = Signal(str, str)
+    clicked_with_modifiers = Signal(int, object)   # (id, Qt.KeyboardModifiers)
+    context_requested = Signal(int, object)        # (id, global QPoint)
 
     def __init__(self, torrent: dict, text_width: int = 320, parent=None):
         super().__init__(parent)
         self.torrent_id = torrent["id"]
         self._t: dict = {}
         self._text_width = max(text_width, 120)
+        self._btn_mode = "pause"
         self._hover = 0.0
+        self._selected = False
         self._expanded = False
         self.setAttribute(Qt.WA_Hover, True)
 
@@ -209,8 +213,26 @@ class TorrentRow(QWidget):
             f"QProgressBar {{ border: none; border-radius: 2px; background: {track} }} "
             f"QProgressBar::chunk {{ border-radius: 2px; background: {argb(color)} }}")
 
+        # Primary action: Remove (red) once complete, Resume (green) while
+        # paused and incomplete, Pause (plain) while active.
         paused = t.get("status", 0) == 0
-        self.toggle_btn.setText("Resume" if paused else "Pause")
+        complete = (t.get("percentDone", 0) >= 1
+                    and t.get("metadataPercentComplete", 1) >= 1)
+        if complete:
+            self._btn_mode, text, color = "remove", "Remove", NEGATIVE
+        elif paused:
+            self._btn_mode, text, color = "resume", "Resume", POSITIVE
+        else:
+            self._btn_mode, text, color = "pause", "Pause", None
+        self.toggle_btn.setText(text)
+        if color is None:
+            self.toggle_btn.setStyleSheet("")
+        else:
+            outline = argb(color)
+            self.toggle_btn.setStyleSheet(
+                f"QToolButton {{ border: 1px solid {outline}; border-radius: 3px;"
+                f" padding: 1px 8px; color: {outline}; }}"
+                f"QToolButton:hover {{ background: {argb(color, 0.15)}; }}")
         if self._expanded:
             self._update_details()
 
@@ -265,7 +287,9 @@ class TorrentRow(QWidget):
     # --- interaction -------------------------------------------------------
 
     def _on_toggle_btn(self):
-        if self._t.get("status", 0) == 0:
+        if self._btn_mode == "remove":
+            self._remove()  # same confirmation flow as the expanded action
+        elif self._btn_mode == "resume":
             self.resume_clicked.emit(self.torrent_id)
         else:
             self.pause_clicked.emit(self.torrent_id)
@@ -286,11 +310,27 @@ class TorrentRow(QWidget):
         if box.exec() == QMessageBox.Yes:
             self.remove_clicked.emit(self.torrent_id, check.isChecked())
 
-    def mouseReleaseEvent(self, event):
+    def mousePressEvent(self, event):
+        # main area selects (expansion is chevron-only); popup owns the
+        # selection set and multi-select semantics
         if (event.button() == Qt.LeftButton
                 and self._header_widget.geometry().contains(event.position().toPoint())):
-            self.toggle_expanded()
-        super().mouseReleaseEvent(event)
+            self.clicked_with_modifiers.emit(self.torrent_id, event.modifiers())
+        super().mousePressEvent(event)
+
+    def contextMenuEvent(self, event):
+        self.context_requested.emit(self.torrent_id, event.globalPos())
+
+    # --- selection ---------------------------------------------------------
+
+    def set_selected(self, selected: bool) -> None:
+        if self._selected != selected:
+            self._selected = selected
+            self.update()
+
+    @property
+    def is_selected(self) -> bool:
+        return self._selected
 
     # --- hover paint -------------------------------------------------------
 
@@ -314,11 +354,16 @@ class TorrentRow(QWidget):
         return super().event(e)
 
     def paintEvent(self, event):
-        if self._hover > 0:
+        # Breeze viewitem alphas: hover 0.30, selected 0.80, selected+hover 1.0
+        if self._selected:
+            alpha = 1.0 if self._hover > 0 else 0.80
+        else:
+            alpha = self._hover
+        if alpha > 0:
             p = QPainter(self)
             p.setRenderHint(QPainter.Antialiasing)
             color = self.palette().color(QPalette.Highlight)
-            color.setAlphaF(self._hover)
+            color.setAlphaF(alpha)
             p.setBrush(color)
             p.setPen(Qt.NoPen)
             p.drawRoundedRect(self.rect(), 5, 5)

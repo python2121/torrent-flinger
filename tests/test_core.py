@@ -233,6 +233,52 @@ class TestFormats(unittest.TestCase):
         self.assertEqual(fmt_eta(3900), "1h 5m")
         self.assertEqual(fmt_eta(90000), "1d 1h")
 
+    def test_map_remote_path(self):
+        from flinger.core.formats import map_remote_path
+        self.assertEqual(map_remote_path("/data/torrents/tv", "/data/torrents",
+                                         "/run/media/nas"), "/run/media/nas/tv")
+        self.assertEqual(map_remote_path("/data/torrents", "/data/torrents",
+                                         "/run/media/nas"), "/run/media/nas")
+        self.assertEqual(map_remote_path("/data/torrents/", "/data/torrents",
+                                         "/run/media/nas/"), "/run/media/nas")
+        self.assertIsNone(map_remote_path("/other/place", "/data/torrents", "/mnt"))
+        # prefix match must be on path components, not raw string prefixes
+        self.assertIsNone(map_remote_path("/data/torrents2/x", "/data/torrents", "/mnt"))
+        self.assertIsNone(map_remote_path("/data/x", "", "/mnt"))
+        self.assertIsNone(map_remote_path("/data/x", "/data", ""))
+
+    def test_common_remote_root(self):
+        from flinger.core.formats import common_remote_root
+        self.assertEqual(common_remote_root(["/data/complete", "/data/tv"]), "/data")
+        self.assertEqual(common_remote_root(["/data/torrents"]), "/data/torrents")
+        self.assertIsNone(common_remote_root(["/data/tv", "/mnt/other"]))  # only "/"
+        self.assertIsNone(common_remote_root([]))
+        self.assertIsNone(common_remote_root(["", "relative/path"]))
+
+    def test_resolve_local_path(self):
+        from flinger.core.formats import resolve_local_path
+        # the user's scenario: movies in default /data/complete, tv in custom
+        # /data/tv, share root /data mounted at /mnt/nas
+        tree = {"/mnt/nas", "/mnt/nas/complete", "/mnt/nas/complete/MovieX",
+                "/mnt/nas/tv", "/mnt/nas/tv/ShowY"}
+        exists = tree.__contains__
+        self.assertEqual(resolve_local_path("/data/complete/MovieX", "/data",
+                                            "/mnt/nas", exists),
+                         "/mnt/nas/complete/MovieX")
+        self.assertEqual(resolve_local_path("/data/tv", "/data", "/mnt/nas", exists),
+                         "/mnt/nas/tv")
+        # wrong/missing prefix → suffix probing still finds the alignment
+        self.assertEqual(resolve_local_path("/data/tv/ShowY", "/data/complete",
+                                            "/mnt/nas", exists),
+                         "/mnt/nas/tv/ShowY")
+        self.assertEqual(resolve_local_path("/srv/deep/data/tv", "", "/mnt/nas", exists),
+                         "/mnt/nas/tv")  # longest existing suffix wins
+        # nothing exists locally → no reveal
+        self.assertIsNone(resolve_local_path("/data/other", "/data", "/mnt/nas", exists))
+        # mapped path must actually exist, never invented
+        self.assertIsNone(resolve_local_path("/data/tv", "/data", "/mnt/gone",
+                                             lambda p: False))
+
     def test_link_names(self):
         self.assertEqual(link_display_name("magnet:?xt=urn:btih:x&dn=My+File"), "My File")
         self.assertEqual(link_display_name("/tmp/some%20file.torrent"), "some file.torrent")

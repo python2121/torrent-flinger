@@ -26,6 +26,31 @@ from .worker import run_async
 POLL_CHOICES = [(1000, "1s"), (3000, "3s"), (10000, "10s"), (30000, "30s")]
 
 
+class AddDirDialog(QDialog):
+    """Small Save/Cancel dialog for adding a custom download directory."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Add custom directory")
+        self.label_edit = QLineEdit(placeholderText="Optional — defaults to folder name")
+        self.dir_edit = QLineEdit(placeholderText="Absolute path on the server, e.g. /data/tv")
+        form = QFormLayout()
+        form.addRow("Label", self.label_edit)
+        form.addRow("Directory", self.dir_edit)
+        buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        self._save_btn = buttons.button(QDialogButtonBox.Save)
+        self._save_btn.setEnabled(False)
+        self.dir_edit.textChanged.connect(
+            lambda text: self._save_btn.setEnabled(bool(text.strip())))
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        root = QVBoxLayout(self)
+        root.addLayout(form)
+        root.addWidget(buttons)
+        self.setMinimumWidth(420)
+        self.dir_edit.setFocus()
+
+
 SESSION_KEYS = [
     "speed-limit-down", "speed-limit-down-enabled",
     "speed-limit-up", "speed-limit-up-enabled",
@@ -105,8 +130,8 @@ class OptionsDialog(QDialog):
         self.dirs.verticalHeader().setVisible(False)
         for entry in config.custom_dirs:
             self._append_dir(entry.get("label", ""), entry.get("dir", ""))
-        add_btn = QPushButton("Add")
-        add_btn.clicked.connect(lambda: self._append_dir("", ""))
+        add_btn = QPushButton("Add…")
+        add_btn.clicked.connect(self._add_dir_dialog)
         del_btn = QPushButton("Remove selected")
         del_btn.clicked.connect(self._remove_dir)
         dir_btns = QHBoxLayout()
@@ -120,6 +145,24 @@ class OptionsDialog(QDialog):
         df.addWidget(QLabel("Custom directories (shown in the download popup):"))
         df.addWidget(self.dirs)
         df.addLayout(dir_btns)
+
+        # local integration: where the server's download share is mounted
+        self.mount_remote = QLineEdit(config.mount_remote)
+        self.mount_remote.setPlaceholderText(
+            "auto: common root of the download dir + custom dirs")
+        self.mount_local = QLineEdit(config.mount_local)
+        self.mount_local.setPlaceholderText("e.g. /run/media/deck/nas/torrents")
+        browse_btn = QPushButton("Browse…")
+        browse_btn.clicked.connect(self._browse_mount)
+        mount_row = QHBoxLayout()
+        mount_row.addWidget(self.mount_local, 1)
+        mount_row.addWidget(browse_btn)
+        local = QGroupBox("Local integration")
+        lof = QFormLayout(local)
+        lof.addRow(QLabel("Where the server's downloads are mounted on this "
+                          "machine — enables “Reveal in Dolphin”:"))
+        lof.addRow("Remote prefix", self.mount_remote)
+        lof.addRow("Local folder", mount_row)
 
         # server-side limits, loaded live via session-get
         self._session_loaded = False
@@ -157,9 +200,27 @@ class OptionsDialog(QDialog):
         root.addWidget(server)
         root.addWidget(general)
         root.addWidget(download)
+        root.addWidget(local)
         root.addWidget(self.limits_group)
         root.addWidget(buttons)
-        self.resize(520, 720)
+        self.resize(520, 780)
+
+    def _add_dir_dialog(self):
+        dialog = AddDirDialog(self)
+        if dialog.exec() == QDialog.Accepted:
+            directory = dialog.dir_edit.text().strip()
+            if directory:
+                label = (dialog.label_edit.text().strip()
+                         or directory.rstrip("/").rsplit("/", 1)[-1])
+                self._append_dir(label, directory)
+
+    def _browse_mount(self):
+        from PySide6.QtWidgets import QFileDialog
+        path = QFileDialog.getExistingDirectory(
+            self, "Local folder where the share is mounted",
+            self.mount_local.text() or str(__import__("pathlib").Path.home()))
+        if path:
+            self.mount_local.setText(path)
 
     def _load_session(self, args: dict):
         self.dl_limited.setChecked(bool(args.get("speed-limit-down-enabled")))
@@ -233,4 +294,7 @@ class OptionsDialog(QDialog):
             start_paused=self.start_paused.isChecked(),
             show_add_dialog=self.show_dialog.isChecked(),
             custom_dirs=dirs,
+            last_download_dir=self.config.last_download_dir,
+            mount_remote=self.mount_remote.text().strip(),
+            mount_local=self.mount_local.text().strip(),
         )

@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..core.formats import fmt_size, fmt_speed, link_display_name
+from ..core.formats import fmt_size, fmt_speed, link_display_name, resolve_local_path
 from .style import NEGATIVE, POSITIVE, argb, build_stylesheet, small_font
 from .torrent_row import TorrentRow
 
@@ -57,6 +57,12 @@ class Popup(QWidget):
     settings_requested = Signal()
     stats_requested = Signal()
     notify = Signal(str, str)
+    # batch actions from the selection context menu (lists of torrent ids)
+    pause_many = Signal(list)
+    resume_many = Signal(list)
+    verify_many = Signal(list)
+    reannounce_many = Signal(list)
+    remove_many = Signal(list, bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -71,6 +77,12 @@ class Popup(QWidget):
         self._section_headers: list[SectionHeader] = []
         self._layout_key: list = []
         self._dismissed_clip = ""
+        self._selected_ids: set[int] = set()
+        self._anchor_id: int | None = None
+        self._mount_remote = ""
+        self._mount_local = ""
+        import os
+        self._exists = os.path.isdir  # injectable for tests
 
         root_frame = QFrame(objectName="popupRoot")
         outer = QVBoxLayout(self)
@@ -280,6 +292,7 @@ class Popup(QWidget):
         current_ids = {t["id"] for t in torrents}
         for tid in [tid for tid in self._rows if tid not in current_ids]:
             row = self._rows.pop(tid)
+            self._selected_ids.discard(tid)
             self.list_layout.removeWidget(row)
             row.deleteLater()
         for t in torrents:
@@ -292,6 +305,8 @@ class Popup(QWidget):
                 row.remove_clicked.connect(self.remove_clicked)
                 row.details_requested.connect(self.details_requested)
                 row.notify.connect(self.notify)
+                row.clicked_with_modifiers.connect(self._on_row_clicked)
+                row.context_requested.connect(self._on_row_context)
                 self._rows[t["id"]] = row
 
         self._relayout()
@@ -356,6 +371,111 @@ class Popup(QWidget):
                 visible_by_header[header] = visible_by_header.get(header, False) or show
         for header in self._section_headers:
             header.setVisible(visible_by_header.get(header, False))
+
+    # --- selection & context menu -----------------------------------------
+
+    def _visual_order(self) -> list[int]:
+        return [row.torrent_id for _group, rows in self._grouped()
+                for row in rows if not row.isHidden()]
+
+    def _apply_selection(self):
+        for tid, row in self._rows.items():
+            row.set_selected(tid in self._selected_ids)
+
+    def _on_row_clicked(self, tid: int, modifiers):
+        modifiers = Qt.KeyboardModifiers(modifiers)
+        if modifiers & Qt.ShiftModifier and self._anchor_id in self._rows:
+            order = self._visual_order()
+            if tid in order and self._anchor_id in order:
+                lo, hi = sorted((order.index(self._anchor_id), order.index(tid)))
+                self._selected_ids = set(order[lo:hi + 1])
+        elif modifiers & Qt.ControlModifier:
+            self._selected_ids.symmetric_difference_update({tid})
+            self._anchor_id = tid
+        else:
+            self._selected_ids = {tid}
+            self._anchor_id = tid
+        self._apply_selection()
+
+    def selected_ids(self) -> list[int]:
+        return [tid for tid in self._visual_order() if tid in self._selected_ids]
+
+    def _on_row_context(self, tid: int, global_pos):
+        if tid not in self._selected_ids:
+            self._selected_ids = {tid}
+            self._anchor_id = tid
+            self._apply_selection()
+        menu = self._build_context_menu(self.selected_ids())
+        menu.exec(global_pos)
+
+    def _build_context_menu(self, ids: list[int]) -> QMenu:
+        menu = QMenu(self)
+        n = len(ids)
+        suffix = "" if n == 1 else f" ({n})"
+        menu.addAction(QAction(f"Resume{suffix}", menu,
+                               triggered=lambda: self.resume_many.emit(ids)))
+        menu.addAction(QAction(f"Pause{suffix}", menu,
+                               triggered=lambda: self.pause_many.emit(ids)))
+        menu.addSeparator()
+        menu.addAction(QAction(f"Verify{suffix}", menu,
+                               triggered=lambda: self.verify_many.emit(ids)))
+        menu.addAction(QAction(f"Reannounce{suffix}", menu,
+                               triggered=lambda: self.reannounce_many.emit(ids)))
+        menu.addAction(QAction("Copy magnet link" + ("s" if n > 1 else ""), menu,
+                               triggered=lambda: self._copy_magnets(ids)))
+        if n == 1:
+            menu.addSeparator()
+            menu.addAction(QAction("Details…", menu,
+                                   triggered=lambda: self.details_requested.emit(ids[0])))
+            local = self._local_path_for(ids[0])
+            if local:
+                menu.addAction(QAction("Reveal in Dolphin", menu,
+                                       triggered=lambda: self._reveal(local)))
+        menu.addSeparator()
+        menu.addAction(QAction(f"Remove{suffix}…", menu,
+                               triggered=lambda: self._confirm_remove(ids)))
+        return menu
+
+    def set_path_mapping(self, remote_prefix: str, local_prefix: str) -> None:
+        self._mount_remote = remote_prefix
+        self._mount_local = local_prefix
+
+    def _local_path_for(self, tid: int) -> str | None:
+        row = self._rows.get(tid)
+        if row is None:
+            return None
+        return resolve_local_path(row._t.get("downloadDir", ""),
+                                  self._mount_remote, self._mount_local,
+                                  self._exists)
+
+    @staticmethod
+    def _reveal(local_path: str):
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+        QDesktopServices.openUrl(QUrl.fromLocalFile(local_path))
+
+    def _copy_magnets(self, ids: list[int]):
+        links = [self._rows[tid]._t.get("magnetLink", "")
+                 for tid in ids if tid in self._rows]
+        links = [link for link in links if link]
+        if links:
+            QApplication.clipboard().setText("\n".join(links))
+            self.notify.emit("Copied", f"{len(links)} magnet link"
+                             + ("s" if len(links) > 1 else ""))
+
+    def _confirm_remove(self, ids: list[int]):
+        from PySide6.QtWidgets import QCheckBox, QMessageBox
+        if len(ids) == 1 and ids[0] in self._rows:
+            what = f"“{self._rows[ids[0]]._t.get('name', '')}”"
+        else:
+            what = f"{len(ids)} torrents"
+        box = QMessageBox(QMessageBox.Warning, "Remove",
+                          f"Remove {what} from Transmission?",
+                          QMessageBox.Yes | QMessageBox.No, self)
+        check = QCheckBox("Also delete downloaded data")
+        box.setCheckBox(check)
+        if box.exec() == QMessageBox.Yes:
+            self.remove_many.emit(ids, check.isChecked())
 
     # --- clipboard magnet offer -------------------------------------------
 

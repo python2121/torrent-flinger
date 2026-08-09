@@ -41,6 +41,11 @@ class Config:
     # [{"label": "TV", "dir": "/data/tv"}, ...]
     custom_dirs: list = field(default_factory=list)
     last_download_dir: str = ""
+    # remote→local path mapping for "Reveal in Dolphin": where the server's
+    # download share is mounted locally. Empty mount_remote = use the server's
+    # default download-dir as the remote prefix.
+    mount_remote: str = ""
+    mount_local: str = ""
 
     @property
     def rpc_url(self) -> str:
