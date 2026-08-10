@@ -34,6 +34,7 @@ from ..core.formats import fmt_eta, fmt_size, fmt_speed, status_name
 from .style import NEGATIVE, POSITIVE, argb, small_font, state_color, state_pixmap, torrent_state
 
 ROW_HEIGHT = 44
+BUTTON_SIZE = 24  # square size shared by the ✕ box and the chevron
 EXPAND_MS = 100
 HOVER_MS = 50
 
@@ -92,6 +93,7 @@ class TorrentRow(QWidget):
         self.toggle_btn.setToolButtonStyle(Qt.ToolButtonTextOnly)
         self.toggle_btn.clicked.connect(self._on_toggle_btn)
         self.chevron = QToolButton(autoRaise=True, text="⌄")
+        self.chevron.setFixedSize(BUTTON_SIZE, BUTTON_SIZE)
         self.chevron.clicked.connect(self.toggle_expanded)
 
         header = QHBoxLayout()
@@ -219,19 +221,28 @@ class TorrentRow(QWidget):
         complete = (t.get("percentDone", 0) >= 1
                     and t.get("metadataPercentComplete", 1) >= 1)
         if complete:
-            self._btn_mode, text, color = "remove", "Remove", NEGATIVE
+            self._btn_mode, text, color = "remove", "✕", NEGATIVE
         elif paused:
             self._btn_mode, text, color = "resume", "Resume", POSITIVE
         else:
             self._btn_mode, text, color = "pause", "Pause", None
         self.toggle_btn.setText(text)
+        self.toggle_btn.setToolTip("Remove torrent" if self._btn_mode == "remove" else "")
+        if self._btn_mode == "remove":
+            # ✕ box matches the chevron's footprint exactly
+            self.toggle_btn.setFixedSize(BUTTON_SIZE, BUTTON_SIZE)
+        else:
+            self.toggle_btn.setMinimumSize(0, 0)
+            self.toggle_btn.setMaximumSize(16777215, 16777215)
         if color is None:
             self.toggle_btn.setStyleSheet("")
         else:
             outline = argb(color)
+            extra = ("font-size: 15px; font-weight: bold; padding: 0px;"
+                     if self._btn_mode == "remove" else "padding: 1px 8px;")
             self.toggle_btn.setStyleSheet(
                 f"QToolButton {{ border: 1px solid {outline}; border-radius: 3px;"
-                f" padding: 1px 8px; color: {outline}; }}"
+                f" color: {outline}; {extra} }}"
                 f"QToolButton:hover {{ background: {argb(color, 0.15)}; }}")
         if self._expanded:
             self._update_details()

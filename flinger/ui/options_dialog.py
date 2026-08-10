@@ -8,7 +8,6 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QDoubleSpinBox,
     QFormLayout,
-    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -16,7 +15,9 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QTableWidget,
     QTableWidgetItem,
+    QTabWidget,
     QVBoxLayout,
+    QWidget,
 )
 
 from ..core.config import Config
@@ -93,7 +94,7 @@ class OptionsDialog(QDialog):
         test_row.addWidget(test_btn)
         test_row.addWidget(self.test_result, 1)
 
-        server = QGroupBox("Server")
+        server = QWidget()
         sf = QFormLayout(server)
         sf.addRow("Address", addr)
         sf.addRow("RPC Path", self.rpc_path)
@@ -113,7 +114,7 @@ class OptionsDialog(QDialog):
             self.poll.addItem(label, ms)
         self.poll.setCurrentIndex(max(0, [ms for ms, _ in POLL_CHOICES].index(config.poll_interval_ms)
                                       if config.poll_interval_ms in [ms for ms, _ in POLL_CHOICES] else 1))
-        general = QGroupBox("General")
+        general = QWidget()
         gf = QFormLayout(general)
         gf.addRow(self.notify_add)
         gf.addRow(self.notify_finish)
@@ -138,7 +139,7 @@ class OptionsDialog(QDialog):
         dir_btns.addWidget(add_btn)
         dir_btns.addWidget(del_btn)
         dir_btns.addStretch(1)
-        download = QGroupBox("Download")
+        download = QWidget()
         df = QVBoxLayout(download)
         df.addWidget(self.start_paused)
         df.addWidget(self.show_dialog)
@@ -157,10 +158,12 @@ class OptionsDialog(QDialog):
         mount_row = QHBoxLayout()
         mount_row.addWidget(self.mount_local, 1)
         mount_row.addWidget(browse_btn)
-        local = QGroupBox("Local integration")
+        local = QWidget()
         lof = QFormLayout(local)
-        lof.addRow(QLabel("Where the server's downloads are mounted on this "
-                          "machine — enables “Reveal in Dolphin”:"))
+        hint = QLabel("Where the server's downloads are mounted on this "
+                      "machine — enables “Reveal in Dolphin”:")
+        hint.setWordWrap(True)
+        lof.addRow(hint)
         lof.addRow("Remote prefix", self.mount_remote)
         lof.addRow("Local folder", mount_row)
 
@@ -175,8 +178,10 @@ class OptionsDialog(QDialog):
         self.ratio_limited = QCheckBox("Stop seeding at ratio")
         self.ratio_limit = QDoubleSpinBox(minimum=0.0, maximum=1000.0)
         self.ratio_limit.setSingleStep(0.1)
-        self.limits_group = QGroupBox("Server limits (applied on the server)")
+        self.limits_group = QWidget()
         lf = QFormLayout(self.limits_group)
+        limits_hint = QLabel("Applied live on the server:")
+        lf.addRow(limits_hint)
         lf.addRow(self.dl_limited, self.dl_limit)
         lf.addRow(self.ul_limited, self.ul_limit)
         lf.addRow("Turtle download (KB/s)", self.alt_dl)
@@ -196,14 +201,19 @@ class OptionsDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
 
+        # tabbed like the torrent details window — keeps the dialog short
+        # enough for small screens
+        tabs = QTabWidget()
+        tabs.addTab(server, "Server")
+        tabs.addTab(general, "General")
+        tabs.addTab(download, "Download")
+        tabs.addTab(local, "Local")
+        tabs.addTab(self.limits_group, "Limits")
+
         root = QVBoxLayout(self)
-        root.addWidget(server)
-        root.addWidget(general)
-        root.addWidget(download)
-        root.addWidget(local)
-        root.addWidget(self.limits_group)
+        root.addWidget(tabs)
         root.addWidget(buttons)
-        self.resize(520, 780)
+        self.resize(540, 440)
 
     def _add_dir_dialog(self):
         dialog = AddDirDialog(self)

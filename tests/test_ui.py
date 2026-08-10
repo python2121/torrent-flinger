@@ -184,6 +184,13 @@ class PopupTest(unittest.TestCase):
         actions = [a.text() for a in popup._build_context_menu([1]).actions()]
         self.assertIn("Reveal in Dolphin", actions)
         self.assertEqual(popup._local_path_for(1), "/run/media/nas")
+        # when the torrent's own folder exists, reveal targets the item itself
+        popup._exists_any = lambda path: path == "/run/media/nas/ubuntu.iso"
+        self.assertEqual(popup._reveal_paths(1),
+                         ("/run/media/nas", "/run/media/nas/ubuntu.iso"))
+        # content not there yet → falls back to just the directory
+        popup._exists_any = lambda path: False
+        self.assertEqual(popup._reveal_paths(1), ("/run/media/nas", ""))
         # multi-selection → no reveal entry
         actions = [a.text() for a in popup._build_context_menu([1, 2]).actions()]
         self.assertNotIn("Reveal in Dolphin", actions)
@@ -216,8 +223,12 @@ class PopupTest(unittest.TestCase):
         popup, _ = self.make_popup()
         rows = popup._rows
         self.assertEqual(rows[1].toggle_btn.text(), "Pause")    # downloading 40%
-        self.assertEqual(rows[2].toggle_btn.text(), "Remove")   # seeding, 100%
-        self.assertEqual(rows[3].toggle_btn.text(), "Remove")   # finished
+        self.assertEqual(rows[2].toggle_btn.text(), "✕")        # seeding, 100%
+        self.assertEqual(rows[3].toggle_btn.text(), "✕")        # finished
+        self.assertEqual(rows[2]._btn_mode, "remove")
+        # ✕ box and chevron share the same footprint
+        self.assertEqual(rows[2].toggle_btn.minimumSize(), rows[2].chevron.minimumSize())
+        self.assertEqual(rows[2].toggle_btn.maximumSize(), rows[2].chevron.maximumSize())
         self.assertEqual(rows[4].toggle_btn.text(), "Resume")   # paused at 20%
         self.assertEqual(rows[1].toggle_btn.styleSheet(), "")           # plain
         self.assertIn("27ae60", rows[4].toggle_btn.styleSheet())        # green outline

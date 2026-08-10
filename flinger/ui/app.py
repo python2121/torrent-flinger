@@ -5,7 +5,7 @@ import webbrowser
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
-from PySide6.QtCore import QObject, QTimer
+from PySide6.QtCore import QObject, Qt, QTimer
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
@@ -62,6 +62,7 @@ class FlingerApp(QObject):
             lambda title, body: self.tray.showMessage(
                 title, body, QSystemTrayIcon.Information, 3000))
         self._details: dict[int, object] = {}
+        self._options_dialog = None
 
         self.tray = QSystemTrayIcon(icon)
         self.tray.setToolTip("Torrent Flinger")
@@ -222,19 +223,36 @@ class FlingerApp(QObject):
         self.popup.toggle_near(geo if geo.isValid() and not geo.isEmpty() else None)
 
     def _show_options(self):
+        # non-modal, like the details windows — never blocks the popup
+        if self._options_dialog is not None:
+            try:
+                self._options_dialog.raise_()
+                self._options_dialog.activateWindow()
+                return
+            except RuntimeError:
+                self._options_dialog = None  # already deleted
         dialog = OptionsDialog(self.config, self.client)
-        if dialog.exec() == OptionsDialog.Accepted:
-            self.config = dialog.to_config()
-            self.config.save()
-            self.client = TransmissionClient.from_config(self.config)
-            session_args = dialog.session_args()
-            if session_args:
-                self._action(lambda: self.client.session_set(session_args))
-            self._finished_ids = None
-            self._poll()
+        dialog.setAttribute(Qt.WA_DeleteOnClose)
+        dialog.accepted.connect(lambda: self._apply_options(dialog))
+        dialog.destroyed.connect(
+            lambda: setattr(self, "_options_dialog", None))
+        self._options_dialog = dialog
+        dialog.show()
+
+    def _apply_options(self, dialog):
+        self.config = dialog.to_config()
+        self.config.save()
+        self.client = TransmissionClient.from_config(self.config)
+        session_args = dialog.session_args()
+        if session_args:
+            self._action(lambda: self.client.session_set(session_args))
+        self._finished_ids = None
+        self._poll()
 
     def _show_stats(self):
-        StatsDialog(self.client).exec()
+        dialog = StatsDialog(self.client)
+        dialog.setAttribute(Qt.WA_DeleteOnClose)
+        dialog.show()
 
     def _open_details(self, torrent_id: int):
         existing = self._details.get(torrent_id)

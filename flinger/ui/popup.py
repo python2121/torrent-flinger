@@ -82,7 +82,8 @@ class Popup(QWidget):
         self._mount_remote = ""
         self._mount_local = ""
         import os
-        self._exists = os.path.isdir  # injectable for tests
+        self._exists = os.path.isdir      # injectable for tests
+        self._exists_any = os.path.exists  # files or dirs (torrent content)
 
         root_frame = QFrame(objectName="popupRoot")
         outer = QVBoxLayout(self)
@@ -427,10 +428,11 @@ class Popup(QWidget):
             menu.addSeparator()
             menu.addAction(QAction("Details…", menu,
                                    triggered=lambda: self.details_requested.emit(ids[0])))
-            local = self._local_path_for(ids[0])
-            if local:
+            paths = self._reveal_paths(ids[0])
+            if paths:
+                local_dir, item = paths
                 menu.addAction(QAction("Reveal in Dolphin", menu,
-                                       triggered=lambda: self._reveal(local)))
+                                       triggered=lambda: self._reveal(local_dir, item)))
         menu.addSeparator()
         menu.addAction(QAction(f"Remove{suffix}…", menu,
                                triggered=lambda: self._confirm_remove(ids)))
@@ -448,11 +450,38 @@ class Popup(QWidget):
                                   self._mount_remote, self._mount_local,
                                   self._exists)
 
+    def _reveal_paths(self, tid: int) -> tuple[str, str] | None:
+        """(containing dir, torrent's own file/folder path or "").
+        The item path lets Dolphin highlight the torrent itself instead of
+        just opening the directory it lives in."""
+        local_dir = self._local_path_for(tid)
+        if not local_dir:
+            return None
+        name = self._rows[tid]._t.get("name", "")
+        item = f"{local_dir}/{name}" if name else ""
+        if item and not self._exists_any(item):
+            item = ""  # not there (yet) — fall back to opening the directory
+        return local_dir, item
+
     @staticmethod
-    def _reveal(local_path: str):
+    def _reveal(local_dir: str, item_path: str = ""):
         from PySide6.QtCore import QUrl
         from PySide6.QtGui import QDesktopServices
-        QDesktopServices.openUrl(QUrl.fromLocalFile(local_path))
+        if item_path:
+            # FileManager1.ShowItems opens the parent with the item selected —
+            # proper "reveal" semantics (Dolphin implements this)
+            try:
+                from PySide6.QtDBus import QDBusConnection, QDBusMessage
+                msg = QDBusMessage.createMethodCall(
+                    "org.freedesktop.FileManager1", "/org/freedesktop/FileManager1",
+                    "org.freedesktop.FileManager1", "ShowItems")
+                msg.setArguments([[QUrl.fromLocalFile(item_path).toString()], ""])
+                reply = QDBusConnection.sessionBus().call(msg)
+                if reply.type() != QDBusMessage.MessageType.ErrorMessage:
+                    return
+            except Exception:  # noqa: BLE001, S110 — any D-Bus trouble → plain open
+                pass
+        QDesktopServices.openUrl(QUrl.fromLocalFile(local_dir))
 
     def _copy_magnets(self, ids: list[int]):
         links = [self._rows[tid]._t.get("magnetLink", "")
