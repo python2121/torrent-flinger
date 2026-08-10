@@ -14,11 +14,15 @@ covers per-torrent administration.
 ## What it does
 
 **Tray popup** (styled like plasma-nm, 432px):
-- Header: turtle-mode toggle, debounce-free search (`Ctrl+F`), add-torrent menu
+- Header: debounce-free search (`Ctrl+F`), add-torrent menu
+- Click to select, `Shift`-click for a range, `Ctrl`-click to toggle, `↑`/`↓`
+  to walk the list (scrolling the row into view), `Shift`+`↑`/`↓` to extend the
+  selection
 - Torrents grouped by status (Error first, then Downloading / Verifying /
   Seeding / Paused / Finished) with per-group counts — no filter chrome
 - Compact rows: state icon, name, `↓/↑ speed · % · ETA` subtitle, slim
-  state-colored progress bar, one-click Pause/Resume
+  state-colored progress bar, one-click Pause/Resume/Remove (the ✕ on a
+  completed torrent removes straight away, without a confirmation)
 - Click a row to expand in place (animated, 100 ms): quick stats grid +
   Details / Copy magnet / Remove actions
 - Clipboard magnet detection: open the popup with a magnet link copied and it
@@ -36,8 +40,9 @@ covers per-torrent administration.
 - Actions: pause/resume, verify, reannounce, set location (with/without moving
   data), copy magnet, remove (with optional data deletion)
 
-**Server administration**: global + turtle speed limits and default seed ratio
-(edited live via `session-set`), session statistics dialog (current +
+**Server administration**: global speed limits, turtle mode (its on/off switch
+and its limits) and the default seed ratio — all on the Options → Limits tab,
+edited live via `session-set` — plus a session statistics dialog (current +
 cumulative), start/pause all, port-ready RPC client for more (`port-test`,
 `queue-move-*`, `free-space` are all implemented and tested).
 

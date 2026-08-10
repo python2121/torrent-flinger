@@ -14,7 +14,6 @@ final class TorrentStore: ObservableObject {
 
     @Published private(set) var torrents: [Torrent] = []
     @Published private(set) var stats = SessionStats()
-    @Published private(set) var turtle = false
     @Published private(set) var freeSpace: Int64 = -1
     @Published private(set) var connected = false
     @Published private(set) var errorMessage: String?
@@ -26,6 +25,10 @@ final class TorrentStore: ObservableObject {
     @Published var searchText = ""
     @Published var selectedIDs: Set<Int> = []
     @Published var expandedIDs: Set<Int> = []
+
+    /// Row the list should scroll into view — set by keyboard navigation and
+    /// cleared by the list once it has obliged.
+    @Published private(set) var scrollTarget: Int?
 
     /// A `magnet:` link sitting in the clipboard that we haven't offered (or
     /// been told to stop offering) yet — drives the popover's clipboard banner.
@@ -47,6 +50,10 @@ final class TorrentStore: ObservableObject {
     private var dismissedClipboard = ""
     /// Anchor for shift-click range selection.
     private var anchorID: Int?
+
+    /// The moving end of the selection — the row last clicked or arrowed onto.
+    /// Shift-arrowing walks this while `anchorID` stays put.
+    private var cursorID: Int?
 
     /// Injectable for tests; the real one hits the filesystem.
     var directoryExists: (String) -> Bool = { path in
@@ -96,6 +103,7 @@ final class TorrentStore: ObservableObject {
             // should look freshly opened rather than resuming a stale session.
             selectedIDs.removeAll()
             anchorID = nil
+            cursorID = nil
         }
     }
 
@@ -110,7 +118,7 @@ final class TorrentStore: ObservableObject {
         // main actor; only the client (an actor of its own) needs awaiting.
         Task { [weak self] in
             do {
-                let session = try await client.sessionGet(["alt-speed-enabled", "download-dir"])
+                let session = try await client.sessionGet(["download-dir"])
                 var free: Int64 = -1
                 if let dir = session.downloadDir, !dir.isEmpty {
                     // Free space is decoration; never fail the poll over it.
@@ -132,7 +140,6 @@ final class TorrentStore: ObservableObject {
         isPolling = false
         self.torrents = torrents
         self.stats = stats
-        self.turtle = session.altSpeedEnabled ?? false
         self.freeSpace = freeSpace
         self.serverDownloadDir = session.downloadDir ?? ""
         let wasConnected = self.connected
@@ -248,7 +255,24 @@ final class TorrentStore: ObservableObject {
                                      anchor: anchorID, order: visualOrder)
         selectedIDs = result.selection
         anchorID = result.anchor
+        // Every click moves the cursor, including a shift-click: arrowing on
+        // from a shift-clicked row continues from where the click landed.
+        cursorID = id
     }
+
+    /// Keyboard navigation: Up (-1) / Down (+1) walk the visible list. A plain
+    /// arrow lands on exactly what a plain click would produce; with `extend`
+    /// (Shift held) the anchor stays put and the range grows or shrinks toward
+    /// the new row, exactly as a shift-click on it would.
+    func moveSelection(_ direction: Int, extend: Bool = false) {
+        guard let id = Selection.step(direction, current: selectedIDs,
+                                      cursor: cursorID, order: visualOrder) else { return }
+        select(id: id, modifiers: extend ? [.shift] : [])
+        scrollTarget = id
+    }
+
+    /// Consumed by the list once it has scrolled the row into view.
+    func clearScrollTarget() { scrollTarget = nil }
 
     /// A right-click acts on the selection when the clicked row is part of it,
     /// otherwise it selects that row first — standard list-view behavior.
@@ -291,11 +315,6 @@ final class TorrentStore: ObservableObject {
     func remove(_ ids: [Int], deleteData: Bool) {
         selectedIDs.subtract(ids)
         perform("Couldn't remove") { try await $0.remove(ids, deleteData: deleteData) }
-    }
-
-    func setTurtle(_ enabled: Bool) {
-        turtle = enabled   // optimistic: the toggle should not lag a round trip
-        perform("Couldn't switch turtle mode") { try await $0.setTurtle(enabled) }
     }
 
     /// Add a magnet URI or a local `.torrent` path, announcing the outcome the

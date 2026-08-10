@@ -16,8 +16,8 @@ struct PopoverActions {
 
 /// The tray popup, ported from `flinger/ui/popup.py` and dressed in the
 /// ClaudeUsage panel's visual language: header strip (title row + toolbar with
-/// turtle toggle, search, add button), status-grouped torrent list with
-/// expandable rows, footer with aggregate speeds + free space and
+/// search and add button), status-grouped torrent list with expandable rows,
+/// footer with aggregate speeds + free space and
 /// stats/web-UI/settings controls.
 struct PopoverView: View {
     @ObservedObject var store: TorrentStore
@@ -69,22 +69,6 @@ struct PopoverView: View {
 
     private var toolbar: some View {
         HStack(spacing: 8) {
-            Button {
-                store.setTurtle(!store.turtle)
-            } label: {
-                Image(systemName: "tortoise.fill")
-                    .font(.system(size: 12))
-                    .foregroundStyle(store.turtle ? Color.white : Color.secondary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 4)
-                    .background(
-                        RoundedRectangle(cornerRadius: 5)
-                            .fill(store.turtle ? Color.accentColor : Color.secondary.opacity(0.15))
-                    )
-            }
-            .buttonStyle(.plain)
-            .help("Turtle mode (alternative speed limits)")
-
             searchField
 
             Menu {
@@ -170,20 +154,31 @@ struct PopoverView: View {
         if groups.isEmpty {
             placeholder
         } else {
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 2) {
-                    ForEach(groups, id: \.name) { group in
-                        sectionHeader(group.name, count: group.torrents.count)
-                        ForEach(group.torrents) { torrent in
-                            TorrentRowView(store: store, torrent: torrent, actions: actions)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 2) {
+                        ForEach(groups, id: \.name) { group in
+                            sectionHeader(group.name, count: group.torrents.count)
+                            ForEach(group.torrents) { torrent in
+                                TorrentRowView(store: store, torrent: torrent, actions: actions)
+                                    .id(torrent.id)
+                            }
                         }
                     }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
+                .frame(maxHeight: maxListHeight)
+                .scrollBounceBehavior(.basedOnSize)
+                // Keyboard navigation can land on a row that's scrolled off;
+                // the store asks for it here and we clear the request so the
+                // next press on the same row scrolls again.
+                .onChange(of: store.scrollTarget) { _, target in
+                    guard let target else { return }
+                    proxy.scrollTo(target)
+                    store.clearScrollTarget()
+                }
             }
-            .frame(maxHeight: maxListHeight)
-            .scrollBounceBehavior(.basedOnSize)
         }
     }
 

@@ -161,8 +161,15 @@ struct Config: Codable, Equatable {
 
     static let appName = "torrent-flinger"
 
+    /// `TORRENT_FLINGER_CONFIG_DIR` overrides the location, matching the Python
+    /// build — it's how a test or a sandbox redirects the config away from the
+    /// real one. Unset (the normal case) means the standard location.
     static var directory: URL {
-        FileManager.default.homeDirectoryForCurrentUser
+        if let override = ProcessInfo.processInfo.environment["TORRENT_FLINGER_CONFIG_DIR"],
+           !override.isEmpty {
+            return URL(fileURLWithPath: override, isDirectory: true)
+        }
+        return FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/\(appName)", isDirectory: true)
     }
 

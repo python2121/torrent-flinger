@@ -14,7 +14,12 @@ from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
-from tests.test_core import MockRPC
+# Importing test_core redirects TORRENT_FLINGER_CONFIG_DIR at a throwaway
+# directory, which several tests here need: they save a Config as a side effect
+# (AddDialog remembers the last download directory, the options dialog writes on
+# apply) and would otherwise overwrite the real user's config on macOS, where
+# config_dir() ignores XDG_CONFIG_HOME.
+from tests.test_core import CONFIG_DIR, MockRPC
 
 
 def wait_until(condition, timeout_ms=3000, step_ms=50):
@@ -53,7 +58,7 @@ class PopupTest(unittest.TestCase):
             _torrent(4, "broken.iso", 0, 0.2, errorString="tracker error"),
         ]
         popup.set_data(torrents, {"downloadSpeed": 1_200_000, "uploadSpeed": 88_000},
-                       turtle=False, free_space=42_000_000_000, server="nas")
+                       free_space=42_000_000_000, server="nas")
         return popup, torrents
 
     def test_grouping(self):
@@ -80,11 +85,10 @@ class PopupTest(unittest.TestCase):
         popup, torrents = self.make_popup()
         row_before = popup._rows[1]
         torrents[0]["percentDone"] = 0.9
-        popup.set_data(torrents, {}, turtle=True)
+        popup.set_data(torrents, {})
         self.assertIs(popup._rows[1], row_before)          # same widget, updated
-        self.assertTrue(popup.turtle_btn.isChecked())
         # remove one torrent → row goes away, groups re-laid out
-        popup.set_data(torrents[:2], {}, turtle=False)
+        popup.set_data(torrents[:2], {})
         self.assertEqual(set(popup._rows), {1, 2})
 
     def test_row_expansion(self):
@@ -252,6 +256,62 @@ class PopupTest(unittest.TestCase):
         self.assertIn("27ae60", rows[4].toggle_btn.styleSheet())        # green outline
         self.assertIn("da4453", rows[2].toggle_btn.styleSheet())        # red outline
 
+    def test_remove_button_skips_confirmation(self):
+        popup, _ = self.make_popup()
+        removed = []
+        popup.remove_clicked.connect(lambda tid, data: removed.append((tid, data)))
+        popup._rows[2].toggle_btn.click()   # ✕ on a completed torrent
+        # No dialog to dismiss: the signal has already fired, keeping the data.
+        self.assertEqual(removed, [(2, False)])
+
+    def test_arrow_keys_walk_the_list(self):
+        from PySide6.QtTest import QTest
+        popup, _ = self.make_popup()
+        popup.show()
+        order = popup._visual_order()          # Error, Downloading, Seeding, Finished
+        # Sent to the search field, where focus lives: a single-line QLineEdit
+        # ignores Up/Down, so they bubble up to the popup.
+        QTest.keyClick(popup.search, Qt.Key_Down)
+        self.assertEqual(popup._selected_ids, {order[0]})
+        QTest.keyClick(popup.search, Qt.Key_Down)
+        self.assertEqual(popup._selected_ids, {order[1]})
+        QTest.keyClick(popup.search, Qt.Key_Up)
+        self.assertEqual(popup._selected_ids, {order[0]})
+        self.assertTrue(popup._rows[order[0]].is_selected)
+        QTest.keyClick(popup.search, Qt.Key_Up)                 # clamps at the top
+        self.assertEqual(popup._selected_ids, {order[0]})
+        for _ in order:
+            QTest.keyClick(popup.search, Qt.Key_Down)
+        self.assertEqual(popup._selected_ids, {order[-1]})      # and at the bottom
+
+    def test_shift_arrow_extends_the_selection(self):
+        from PySide6.QtTest import QTest
+        popup, _ = self.make_popup()
+        popup.show()
+        order = popup._visual_order()
+        QTest.keyClick(popup.search, Qt.Key_Down)               # start at the top
+        QTest.keyClick(popup.search, Qt.Key_Down, Qt.ShiftModifier)
+        self.assertEqual(popup._selected_ids, set(order[:2]))
+        QTest.keyClick(popup.search, Qt.Key_Down, Qt.ShiftModifier)
+        self.assertEqual(popup._selected_ids, set(order[:3]))
+        self.assertEqual(popup._anchor_id, order[0])            # anchor stays put
+        # Reversing shrinks the same range rather than starting a new one.
+        QTest.keyClick(popup.search, Qt.Key_Up, Qt.ShiftModifier)
+        self.assertEqual(popup._selected_ids, set(order[:2]))
+        # A plain arrow collapses back to a single row.
+        QTest.keyClick(popup.search, Qt.Key_Down)
+        self.assertEqual(popup._selected_ids, {order[2]})
+
+    def test_arrow_keys_skip_filtered_rows(self):
+        popup, _ = self.make_popup()
+        popup.search.setText("iso")            # everything matches
+        popup.step_selection(1)
+        first = popup._visual_order()[0]
+        popup.search.setText("fedora")         # anchor row now hidden
+        popup.step_selection(1)
+        self.assertEqual(popup._selected_ids, {2})
+        self.assertNotEqual(first, 2)
+
     def test_row_subtitle_content(self):
         popup, _ = self.make_popup()
         self.assertIn("↓ 1.2 MB/s", popup._rows[1].subtitle_label.text())
@@ -362,11 +422,9 @@ class AppIntegrationTest(unittest.TestCase):
         cls.server = HTTPServer(("127.0.0.1", 0), MockRPC)
         threading.Thread(target=cls.server.serve_forever, daemon=True).start()
         import json
-        import tempfile
-        cls.confdir = tempfile.mkdtemp(prefix="flinger-test-")
-        os.environ["XDG_CONFIG_HOME"] = cls.confdir
-        os.makedirs(os.path.join(cls.confdir, "torrent-flinger"), exist_ok=True)
-        with open(os.path.join(cls.confdir, "torrent-flinger", "config.json"), "w") as f:
+        # TORRENT_FLINGER_CONFIG_DIR (set at import) is the only redirection
+        # that works on both platforms — XDG_CONFIG_HOME is Linux-only.
+        with open(os.path.join(CONFIG_DIR, "config.json"), "w") as f:
             json.dump({"host": "127.0.0.1", "port": cls.server.server_address[1],
                        "rpc_path": "/rpc", "show_add_dialog": False,
                        "notify_on_add": False, "poll_interval_ms": 1000}, f)
@@ -374,7 +432,6 @@ class AppIntegrationTest(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.server.shutdown()
-        os.environ.pop("XDG_CONFIG_HOME", None)
 
     def test_app_polls_and_adds(self):
         from flinger.ui.app import FlingerApp
@@ -395,8 +452,12 @@ class AppIntegrationTest(unittest.TestCase):
             added = [c for c in MockRPC.calls if c[0] == "torrent-add"][-1]
             self.assertEqual(added[1]["filename"], "magnet:?xt=urn:btih:abc&dn=new.iso")
 
-            # turtle toggle goes through session-set
-            flinger.popup.turtle_btn.setChecked(True)
+            # turtle mode now lives in the options dialog, applied on save
+            from flinger.ui.options_dialog import OptionsDialog
+            dialog = OptionsDialog(flinger.config)   # no client → no live load
+            dialog._load_session({"alt-speed-enabled": False})
+            dialog.alt_enabled.setChecked(True)
+            flinger._apply_options(dialog)
             self.assertTrue(wait_until(
                 lambda: any(c[0] == "session-set" and c[1].get("alt-speed-enabled")
                             for c in MockRPC.calls)))

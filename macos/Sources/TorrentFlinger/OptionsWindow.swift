@@ -40,7 +40,7 @@ final class OptionsViewModel: ObservableObject {
     static let sessionKeys = [
         "speed-limit-down", "speed-limit-down-enabled",
         "speed-limit-up", "speed-limit-up-enabled",
-        "alt-speed-down", "alt-speed-up",
+        "alt-speed-enabled", "alt-speed-down", "alt-speed-up",
         "seedRatioLimit", "seedRatioLimited",
     ]
 
@@ -64,6 +64,7 @@ final class OptionsViewModel: ObservableObject {
     @Published var downloadLimit = 100
     @Published var uploadLimited = false
     @Published var uploadLimit = 100
+    @Published var altEnabled = false
     @Published var altDownload = 50
     @Published var altUpload = 50
     @Published var ratioLimited = false
@@ -108,6 +109,7 @@ final class OptionsViewModel: ObservableObject {
             downloadLimit = session.speedLimitDown ?? 100
             uploadLimited = session.speedLimitUpEnabled ?? false
             uploadLimit = session.speedLimitUp ?? 100
+            altEnabled = session.altSpeedEnabled ?? false
             altDownload = session.altSpeedDown ?? 50
             altUpload = session.altSpeedUp ?? 50
             ratioLimited = session.seedRatioLimited ?? false
@@ -128,6 +130,7 @@ final class OptionsViewModel: ObservableObject {
             "speed-limit-down-enabled": .bool(downloadLimited),
             "speed-limit-up": .int(uploadLimit),
             "speed-limit-up-enabled": .bool(uploadLimited),
+            "alt-speed-enabled": .bool(altEnabled),
             "alt-speed-down": .int(altDownload),
             "alt-speed-up": .int(altUpload),
             "seedRatioLimit": .double(ratioLimit),
@@ -442,6 +445,7 @@ struct OptionsView: View {
             }
 
             Section {
+                Toggle("Turtle mode (use the alternative limits)", isOn: $model.altEnabled)
                 LabeledContent("Turtle download") {
                     HStack(spacing: 8) {
                         numberField($model.altDownload)

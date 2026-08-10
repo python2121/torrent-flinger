@@ -11,6 +11,13 @@ APP_NAME = "torrent-flinger"
 
 
 def config_dir() -> Path:
+    # An explicit override wins on every platform. Tests and sandboxes need a
+    # way to redirect this that works on macOS too: XDG_CONFIG_HOME doesn't,
+    # since the macOS branch below (rightly) ignores it — which once let the
+    # test suite overwrite a real user's config.
+    override = os.environ.get("TORRENT_FLINGER_CONFIG_DIR")
+    if override:
+        return Path(override)
     if sys.platform == "darwin":
         return Path.home() / "Library" / "Application Support" / APP_NAME
     base = os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config"))

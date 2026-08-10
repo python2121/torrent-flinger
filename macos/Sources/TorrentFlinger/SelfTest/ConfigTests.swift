@@ -94,6 +94,21 @@ enum ConfigTests {
             t.equal(attributes[.posixPermissions] as? NSNumber, 0o600)
         },
 
+        TestEntry("config/directory-honors-the-env-override") { t in
+            // The escape hatch that keeps a test run (or a sandbox) off the
+            // real config — the Python build reads the same variable.
+            if let override = ProcessInfo.processInfo.environment["TORRENT_FLINGER_CONFIG_DIR"],
+               !override.isEmpty {
+                t.equal(Config.directory.path, URL(fileURLWithPath: override).path)
+            } else {
+                let home = FileManager.default.homeDirectoryForCurrentUser.path
+                t.expect(Config.directory.path.hasPrefix(home),
+                         "unset means the standard location under \(home)")
+                t.expect(Config.directory.lastPathComponent == Config.appName,
+                         "expected the app's own directory, got \(Config.directory.path)")
+            }
+        },
+
         TestEntry("config/missing-file-yields-defaults") { t in
             let missing = URL(fileURLWithPath: NSTemporaryDirectory())
                 .appendingPathComponent("flinger-absent-\(UUID().uuidString).json")

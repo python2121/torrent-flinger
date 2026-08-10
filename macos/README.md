@@ -37,14 +37,16 @@ interface, Options…, Quit).
 **Panel** (380pt, borderless `NSPanel` with a vibrant rounded background,
 slide-and-fade in, dismissed by an outside click or Escape):
 
-- Header: server connection dot, turtle-mode toggle, live search, add menu
+- Header: server connection dot, live search, add menu
 - Torrents grouped by status (Error first, then Downloading / Verifying /
   Seeding / Paused / Finished) with per-group counts
 - Compact rows: state badge, name, `↓/↑ speed · % · ETA` subtitle, slim
-  state-colored progress bar, one-click Pause/Resume/Remove
+  state-colored progress bar, one-click Pause/Resume/Remove (the ✕ on a
+  completed torrent removes straight away, without a confirmation)
 - Click the chevron to expand a row in place: quick stats grid plus
   Details / Copy magnet / Reveal in Finder / Remove
-- Click to select, ⇧-click for a range, ⌘-click to toggle; right-click acts on
+- Click to select, ⇧-click for a range, ⌘-click to toggle, ↑/↓ to walk the
+  list (scrolling the row into view), ⇧↑/⇧↓ to extend; right-click acts on
   the whole selection (resume, pause, verify, reannounce, copy magnets, remove)
 - Clipboard magnet detection: open the panel with a magnet link copied and it
   offers to add it
@@ -58,8 +60,9 @@ per-torrent speed limits, seed-ratio mode, peer limit, queue moves; and
 pause/resume, verify, reannounce, set location (with or without moving data),
 copy magnet, remove.
 
-**Server administration**: global + turtle speed limits and default seed ratio
-edited live via `session-set`, and a session-statistics window (current +
+**Server administration**: global speed limits, turtle mode (its on/off switch
+and its limits) and the default seed ratio — all on the Options → Limits tab,
+edited live via `session-set` — and a session-statistics window (current +
 cumulative).
 
 **Link handling**: `CFBundleURLTypes` (scheme `magnet`) and

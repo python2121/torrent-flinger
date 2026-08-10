@@ -59,7 +59,7 @@ class AddDirDialog(QDialog):
 SESSION_KEYS = [
     "speed-limit-down", "speed-limit-down-enabled",
     "speed-limit-up", "speed-limit-up-enabled",
-    "alt-speed-down", "alt-speed-up",
+    "alt-speed-enabled", "alt-speed-down", "alt-speed-up",
     "seedRatioLimit", "seedRatioLimited",
 ]
 
@@ -181,6 +181,7 @@ class OptionsDialog(QDialog):
         self.dl_limit = QSpinBox(minimum=1, maximum=10_000_000)
         self.ul_limited = QCheckBox("Limit upload speed (KB/s)")
         self.ul_limit = QSpinBox(minimum=1, maximum=10_000_000)
+        self.alt_enabled = QCheckBox("Turtle mode (use the alternative limits)")
         self.alt_dl = QSpinBox(minimum=1, maximum=10_000_000)
         self.alt_ul = QSpinBox(minimum=1, maximum=10_000_000)
         self.ratio_limited = QCheckBox("Stop seeding at ratio")
@@ -192,6 +193,7 @@ class OptionsDialog(QDialog):
         lf.addRow(limits_hint)
         lf.addRow(self.dl_limited, self.dl_limit)
         lf.addRow(self.ul_limited, self.ul_limit)
+        lf.addRow(self.alt_enabled)
         lf.addRow("Turtle download (KB/s)", self.alt_dl)
         lf.addRow("Turtle upload (KB/s)", self.alt_ul)
         lf.addRow(self.ratio_limited, self.ratio_limit)
@@ -259,6 +261,7 @@ class OptionsDialog(QDialog):
         self.dl_limit.setValue(int(args.get("speed-limit-down", 100)))
         self.ul_limited.setChecked(bool(args.get("speed-limit-up-enabled")))
         self.ul_limit.setValue(int(args.get("speed-limit-up", 100)))
+        self.alt_enabled.setChecked(bool(args.get("alt-speed-enabled")))
         self.alt_dl.setValue(int(args.get("alt-speed-down", 50)))
         self.alt_ul.setValue(int(args.get("alt-speed-up", 50)))
         self.ratio_limited.setChecked(bool(args.get("seedRatioLimited")))
@@ -276,6 +279,7 @@ class OptionsDialog(QDialog):
             "speed-limit-down-enabled": self.dl_limited.isChecked(),
             "speed-limit-up": self.ul_limit.value(),
             "speed-limit-up-enabled": self.ul_limited.isChecked(),
+            "alt-speed-enabled": self.alt_enabled.isChecked(),
             "alt-speed-down": self.alt_dl.value(),
             "alt-speed-up": self.alt_ul.value(),
             "seedRatioLimit": self.ratio_limit.value(),

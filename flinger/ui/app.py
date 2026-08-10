@@ -36,7 +36,6 @@ class FlingerApp(QObject):
         qapp.setWindowIcon(icon)
 
         self.popup = Popup()
-        self.popup.turtle_toggled.connect(self._set_turtle)
         self.popup.pause_clicked.connect(lambda tid: self._action(lambda: self.client.stop([tid])))
         self.popup.resume_clicked.connect(lambda tid: self._action(lambda: self.client.start([tid])))
         self.popup.remove_clicked.connect(
@@ -113,7 +112,7 @@ class FlingerApp(QObject):
         client = self.client
 
         def fetch():
-            session = client.session_get(["alt-speed-enabled", "download-dir"])
+            session = client.session_get(["download-dir"])
             free = -1
             if session.get("download-dir"):
                 try:
@@ -133,7 +132,6 @@ class FlingerApp(QObject):
         self._polling = False
         torrents = data["torrents"]
         stats = data["stats"]
-        turtle = bool(data["session"].get("alt-speed-enabled"))
         # remote prefix for path mapping: explicit setting, else the common
         # root of the default download dir and all custom dirs (so torrents
         # in /data/complete and /data/tv both map through /data)
@@ -144,7 +142,7 @@ class FlingerApp(QObject):
             prefix = (common_remote_root(candidates)
                       or data["session"].get("download-dir", ""))
         self.popup.set_path_mapping(prefix, self.config.mount_local)
-        self.popup.set_data(torrents, stats, turtle,
+        self.popup.set_data(torrents, stats,
                             free_space=data.get("free_space", -1),
                             server=self.config.host)
         self.tray.setToolTip(
@@ -169,9 +167,6 @@ class FlingerApp(QObject):
         run_async(fn, on_done=lambda _: self._poll(),
                   on_error=lambda msg: self.tray.showMessage(
                       "Transmission error", msg, QSystemTrayIcon.Warning, 4000))
-
-    def _set_turtle(self, enabled):
-        self._action(lambda: self.client.set_turtle(enabled))
 
     # -- links --------------------------------------------------------------
 

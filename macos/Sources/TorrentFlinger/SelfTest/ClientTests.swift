@@ -197,20 +197,19 @@ enum ClientTests {
             t.equal(try await client.portTest(), true)
         },
 
-        TestEntry("client/session-set-and-turtle") { t in
+        TestEntry("client/session-set") { t in
             MockRPC.reset()
             let client = MockRPC.client()
+            // Turtle mode rides along in the same payload as the other limits —
+            // the Options window writes them all in one session-set.
             try await client.sessionSet(["speed-limit-down": .int(500),
-                                         "speed-limit-down-enabled": .bool(true)])
+                                         "speed-limit-down-enabled": .bool(true),
+                                         "alt-speed-enabled": .bool(true)])
             guard let setCall = t.unwrap(MockRPC.lastCall) else { return }
             t.equal(setCall.method, "session-set")
             t.equal(setCall.arguments["speed-limit-down"] as? Int, 500)
             t.equal(setCall.arguments["speed-limit-down-enabled"] as? Bool, true)
-
-            try await client.setTurtle(true)
-            guard let turtleCall = t.unwrap(MockRPC.lastCall) else { return }
-            t.equal(turtleCall.method, "session-set")
-            t.equal(turtleCall.arguments["alt-speed-enabled"] as? Bool, true)
+            t.equal(setCall.arguments["alt-speed-enabled"] as? Bool, true)
         },
 
         TestEntry("client/unreachable-server-is-a-connection-error") { t in
