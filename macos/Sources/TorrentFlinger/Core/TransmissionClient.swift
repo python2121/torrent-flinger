@@ -223,10 +223,6 @@ actor TransmissionClient {
 
     // MARK: Actions
 
-    func setTurtle(_ enabled: Bool) async throws {
-        try await call("session-set", .object(["alt-speed-enabled": .bool(enabled)]))
-    }
-
     private struct AddPayload: Decodable {
         struct Entry: Decodable {
             var id: Int = 0

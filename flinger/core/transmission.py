@@ -157,9 +157,6 @@ class TransmissionClient:
 
     # -- actions ------------------------------------------------------------
 
-    def set_turtle(self, enabled: bool) -> None:
-        self._call("session-set", {"alt-speed-enabled": enabled})
-
     def add(self, link: str, download_dir: str | None = None, paused: bool = False) -> tuple[str, dict]:
         """Add a magnet URI or a local .torrent file path.
 

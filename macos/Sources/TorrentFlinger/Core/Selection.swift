@@ -49,4 +49,22 @@ enum Selection {
             return ([id], id)
         }
     }
+
+    /// The row an Up (`direction` -1) or Down (+1) keypress lands on, or nil
+    /// when the list is empty.
+    ///
+    /// `cursor` is the moving end of the selection — the row last clicked or
+    /// arrowed onto. It's distinct from the anchor: shift-arrowing walks the
+    /// cursor while the anchor stays put, which is what lets a range grow *and*
+    /// shrink. When the cursor has been filtered away, movement resumes from
+    /// the last still-visible selected row; with nothing selected at all, Down
+    /// starts at the top and Up at the bottom. Movement stops at the ends
+    /// rather than wrapping.
+    static func step(_ direction: Int, current: Set<Int>, cursor: Int?, order: [Int]) -> Int? {
+        guard !order.isEmpty else { return nil }
+        let index: Int? = cursor.flatMap { order.firstIndex(of: $0) }
+            ?? order.lastIndex(where: { current.contains($0) })
+        guard let index else { return direction > 0 ? order.first : order.last }
+        return order[min(max(index + direction, 0), order.count - 1)]
+    }
 }

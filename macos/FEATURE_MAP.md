@@ -146,8 +146,16 @@ a POSIX file lock.
   *visual* order (grouping means that differs from server order), ⌘-click
   toggles. The anchor stays put across an extend so the range can be resized
   rather than ratcheting, and an extend with a missing or stale anchor degrades
-  to a plain click instead of selecting nothing. The arithmetic is the pure
-  `Selection.apply`; `TorrentStore` only maps `EventModifiers` onto it.
+  to a plain click instead of selecting nothing. ↑/↓ walk the visible list and
+  land on what a plain click would produce (`Selection.step`), clamping at the
+  ends and resuming from the last visible selected row when the cursor has been
+  filtered away; ⇧↑/⇧↓ apply the landing row as an extend, so one range grows
+  and shrinks. That needs a cursor (the moving end) tracked separately from the
+  anchor — stepping from the anchor would leave ⇧↓ stuck one row from it. The
+  panel takes the arrows in `sendEvent` because the search field is first
+  responder whenever it's open, and the list scrolls the landing row into view.
+  The arithmetic is the pure `Selection.apply`/`Selection.step`; `TorrentStore`
+  only maps `EventModifiers` onto it.
   Selections and expansions are dropped for torrents that disappear
   server-side, and cleared when the panel closes so a reopened panel looks
   freshly opened. `Core/Selection.swift`, `TorrentStore.swift`
@@ -157,8 +165,7 @@ a POSIX file lock.
   omits empty groups so no bare header renders. Pure, so the popover's list
   content is testable without a store. `Core/TransmissionModels.swift`
 - **Actions** — start/stop (single, batch, and all), verify, reannounce,
-  remove (with optional data deletion), turtle toggle (optimistic, so the
-  control doesn't lag a round trip), add, copy magnets, open web UI. Each
+  remove (with optional data deletion), add, copy magnets, open web UI. Each
   re-polls on success and surfaces failures as a notification rather than
   blocking the panel. `TorrentStore.swift`
 - **Reveal in Finder** — resolves the torrent's server-side directory to a local
@@ -186,8 +193,8 @@ a POSIX file lock.
   it on outside clicks; Escape clears an active search first and closes second.
   It follows SwiftUI's `preferredContentSize` so adding a row doesn't make it
   drift. `AppDelegate.swift`
-- **Panel layout** — header (title + connection dot), toolbar (turtle toggle,
-  search, add menu), optional clipboard banner, grouped scrolling list, footer.
+- **Panel layout** — header (title + connection dot), toolbar (search, add
+  menu), optional clipboard banner, grouped scrolling list, footer.
   `PopoverView.swift`
 - **Clipboard magnet offer** — opening the panel with a magnet link copied shows
   a banner offering to add it; dismissing remembers that link so it isn't
@@ -195,7 +202,9 @@ a POSIX file lock.
 - **Expandable rows** — state badge, elided name, `↓/↑ speed · % · ETA`
   subtitle (collapsing to the error string when in trouble, or size + ratio once
   complete), a slim state-colored progress bar, a three-state primary action
-  (Remove when complete / Resume when paused / Pause when active) and a chevron
+  (Remove when complete / Resume when paused / Pause when active — the ✕
+  removes immediately, keeping the data, since it only shows on a completed
+  torrent; the ellipsis entries elsewhere are the ones that confirm) and a chevron
   that expands quick actions plus a six-field detail grid.
   `TorrentRowView.swift`
 - **Row context menu** — resume, pause, verify, reannounce, copy magnet(s),
@@ -234,8 +243,10 @@ a POSIX file lock.
   (notifications, menu-bar speeds, refresh interval), *Download* (start paused,
   show add dialog, and the custom-directory list with radio-exclusive TV
   flagging), *Local* (remote prefix + local mount with a folder picker, which is
-  what enables Reveal in Finder), *Limits* (global and turtle speed caps and the
-  default seed ratio, loaded live via `session-get` and disabled until they
+  what enables Reveal in Finder), *Limits* (global speed caps, the turtle-mode
+  switch and its caps, and the default seed ratio — turtle mode lives here
+  rather than in the toolbar, since it's a set-and-forget server setting;
+  loaded live via `session-get` and disabled until they
   arrive — so a failed load can't overwrite the server's values with our
   defaults). `OptionsWindow.swift`
 - **Details window** — a per-torrent action bar (pause/resume, verify,
@@ -250,7 +261,8 @@ a POSIX file lock.
 - **Statistics window** — this session vs. cumulative totals (downloaded,
   uploaded, ratio, files added, active time, sessions) with a Refresh button.
   `StatsWindow.swift`
-- **Confirmations and pickers** — remove confirmation carries the Linux
+- **Confirmations and pickers** — the remove confirmation (raised by the
+  expanded-row and context-menu entries, not by the row's ✕) carries the Linux
   build's "Also delete downloaded data" checkbox as an `NSAlert` accessory;
   folder selection uses `NSOpenPanel`. Both activate the app first.
   `Dialogs.swift`

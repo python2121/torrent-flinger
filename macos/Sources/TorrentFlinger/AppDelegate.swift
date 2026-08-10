@@ -12,7 +12,28 @@ private final class PopoverPanel: NSPanel {
     /// so this is the keyboard dismissal path.
     var onCancel: (() -> Void)?
 
+    /// Invoked on Up (-1) / Down (+1) to walk the torrent list, with `extend`
+    /// set when Shift is held.
+    var onMove: ((_ direction: Int, _ extend: Bool) -> Void)?
+
     override var canBecomeKey: Bool { true }
+
+    // Arrow keys drive the list, never the search field's caret. Intercepted in
+    // sendEvent rather than keyDown because the field editor is first responder
+    // whenever the panel is open, and it swallows (and beeps at) the arrows
+    // before the window ever sees them. Up/Down do nothing in a single-line
+    // field, so nothing is lost by taking them — Shift included, since
+    // shift-arrow there would only select nothing.
+    override func sendEvent(_ event: NSEvent) {
+        let arrows: Set<UInt16> = [125, 126]   // down, up
+        let claimed: NSEvent.ModifierFlags = [.command, .option, .control]
+        if event.type == .keyDown, arrows.contains(event.keyCode),
+           event.modifierFlags.intersection(claimed).isEmpty {
+            onMove?(event.keyCode == 125 ? 1 : -1, event.modifierFlags.contains(.shift))
+            return
+        }
+        super.sendEvent(event)
+    }
 
     // Esc reaches the window as cancelOperation(_:) via the responder chain
     // when no view inside claims it.
@@ -270,6 +291,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             } else {
                 self.closePanel()
             }
+        }
+        // Up/Down move through the list exactly as clicking a row does;
+        // ⇧-arrow extends the range the way a ⇧-click would.
+        panel.onMove = { [weak self] direction, extend in
+            self?.store.moveSelection(direction, extend: extend)
         }
     }
 

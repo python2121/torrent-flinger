@@ -4,9 +4,20 @@ Run: .venv/bin/python -m unittest discover tests
 """
 import base64
 import json
+import os
+import tempfile
 import threading
 import unittest
 from http.server import BaseHTTPRequestHandler, HTTPServer
+
+# Before importing anything that can save: no test may touch the real config.
+# On macOS config_dir() ignores XDG_CONFIG_HOME, so this override is the only
+# redirection that holds on both platforms. Defined here, the module every
+# other test file imports, so the whole suite shares one throwaway directory —
+# two modules each minting their own would leave the loser writing to a path
+# nothing reads.
+CONFIG_DIR = tempfile.mkdtemp(prefix="flinger-config-")
+os.environ["TORRENT_FLINGER_CONFIG_DIR"] = CONFIG_DIR
 
 from flinger.core.config import Config
 from flinger.core.formats import fmt_eta, fmt_size, fmt_speed, link_display_name
@@ -349,6 +360,32 @@ class TestConfig(unittest.TestCase):
         cfg = Config(host="nas", port=9091)
         self.assertEqual(cfg.rpc_url, "http://nas:9091/transmission/rpc")
         self.assertEqual(cfg.web_url, "http://nas:9091/transmission/web/")
+
+    def test_config_dir_override_beats_the_platform_default(self):
+        """The override must hold on macOS too, where XDG_CONFIG_HOME doesn't.
+
+        Without it a test that saves a Config writes the real user's file.
+        """
+        from flinger.core.config import config_dir, config_path
+        home = os.path.expanduser("~")
+        self.assertFalse(str(config_dir()).startswith(home),
+                         "tests must not resolve to a config dir under $HOME")
+
+        # Restore whatever was there, not this module's CONFIG_DIR: `unittest
+        # discover` (the documented invocation) imports the file both as
+        # `test_core` and, via test_ui, as `tests.test_core`, and the two copies
+        # have different CONFIG_DIRs. Putting back the wrong one leaves the rest
+        # of the suite writing to a directory nothing reads.
+        previous = os.environ["TORRENT_FLINGER_CONFIG_DIR"]
+        with tempfile.TemporaryDirectory() as tmp:
+            os.environ["TORRENT_FLINGER_CONFIG_DIR"] = tmp
+            try:
+                self.assertEqual(str(config_dir()), tmp)
+                Config(host="written-by-a-test").save()
+                self.assertTrue(config_path().exists())
+                self.assertEqual(Config.load().host, "written-by-a-test")
+            finally:
+                os.environ["TORRENT_FLINGER_CONFIG_DIR"] = previous
 
 
 if __name__ == "__main__":

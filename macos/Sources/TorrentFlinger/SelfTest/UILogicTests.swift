@@ -101,6 +101,64 @@ enum UILogicTests {
                     [99], "clicking a row that isn't in the order still selects it")
         },
 
+        TestEntry("selection/arrow-keys-walk-the-visual-order") { t in
+            // Again deliberately not id-sorted: arrows follow what's on screen.
+            let order = [5, 1, 4, 2, 3]
+            t.equal(Selection.step(1, current: [1], cursor: 1, order: order), 4)
+            t.equal(Selection.step(-1, current: [1], cursor: 1, order: order), 5)
+
+            // Nothing selected yet: Down starts at the top, Up at the bottom.
+            t.equal(Selection.step(1, current: [], cursor: nil, order: order), 5)
+            t.equal(Selection.step(-1, current: [], cursor: nil, order: order), 3)
+
+            // The ends clamp instead of wrapping.
+            t.equal(Selection.step(-1, current: [5], cursor: 5, order: order), 5)
+            t.equal(Selection.step(1, current: [3], cursor: 3, order: order), 3)
+
+            // A stale cursor (its row filtered away) resumes from the last
+            // still-visible selected row rather than jumping to the top.
+            t.equal(Selection.step(1, current: [1, 4], cursor: 99, order: order), 2)
+            t.equal(Selection.step(1, current: [], cursor: nil, order: []), nil,
+                    "an empty list has nowhere to move")
+        },
+
+        TestEntry("selection/shift-arrow-grows-and-shrinks-one-range") { t in
+            // What the store does per ⇧-arrow: step the cursor, then apply the
+            // landing row as an extend. The anchor never moves, so reversing
+            // direction shrinks the range instead of starting a second one.
+            let order = [5, 1, 4, 2, 3]
+            var selection: Set<Int> = [1]
+            var anchor: Int? = 1
+            var cursor: Int? = 1
+
+            func shiftArrow(_ direction: Int) {
+                guard let landing = Selection.step(direction, current: selection,
+                                                   cursor: cursor, order: order) else { return }
+                let result = Selection.apply(.extend, to: landing, current: selection,
+                                             anchor: anchor, order: order)
+                selection = result.selection
+                anchor = result.anchor
+                cursor = landing
+            }
+
+            shiftArrow(1)
+            t.equal(selection, [1, 4])
+            shiftArrow(1)
+            t.equal(selection, [1, 4, 2], "the cursor moves, so the range keeps growing")
+            t.equal(anchor, 1, "the anchor stays where the selection started")
+
+            shiftArrow(-1)
+            t.equal(selection, [1, 4], "reversing shrinks the same range")
+            shiftArrow(-1)
+            t.equal(selection, [1])
+            shiftArrow(-1)
+            t.equal(selection, [5, 1], "and past the anchor it grows the other way")
+
+            // At the top edge it clamps, leaving the range as-is.
+            shiftArrow(-1)
+            t.equal(selection, [5, 1])
+        },
+
         TestEntry("custom-dirs/tv-flag-is-exclusive") { t in
             let dirs = [CustomDir(label: "TV", dir: "/data/tv"),
                         CustomDir(label: "Movies", dir: "/data/movies"),

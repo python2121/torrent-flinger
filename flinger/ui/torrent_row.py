@@ -299,7 +299,12 @@ class TorrentRow(QWidget):
 
     def _on_toggle_btn(self):
         if self._btn_mode == "remove":
-            self._remove()  # same confirmation flow as the expanded action
+            # The ✕ only appears on a completed torrent, where removing is
+            # cheap and reversible enough not to be worth a dialog — so it
+            # removes straight away, keeping the data. The expanded-row and
+            # context-menu entries (both spelled with an ellipsis) still
+            # confirm, and are the way to delete the data too.
+            self.remove_clicked.emit(self.torrent_id, False)
         elif self._btn_mode == "resume":
             self.resume_clicked.emit(self.torrent_id)
         else:

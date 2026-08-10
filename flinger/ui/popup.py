@@ -1,5 +1,5 @@
 """The tray popup, styled after Plasma 6 applets (plasma-nm anatomy):
-header strip (title row + toolbar with turtle toggle, search, add button),
+header strip (title row + toolbar with search and add button),
 status-grouped torrent list with expandable rows, footer with aggregate
 speeds + free space and web-UI/settings buttons. All colors from QPalette.
 """
@@ -46,7 +46,6 @@ class SectionHeader(QWidget):
 
 
 class Popup(QWidget):
-    turtle_toggled = Signal(bool)
     pause_clicked = Signal(int)
     resume_clicked = Signal(int)
     remove_clicked = Signal(int, bool)
@@ -79,6 +78,7 @@ class Popup(QWidget):
         self._dismissed_clip = ""
         self._selected_ids: set[int] = set()
         self._anchor_id: int | None = None
+        self._cursor_id: int | None = None   # moving end of a Shift range
         self._mount_remote = ""
         self._mount_local = ""
         import os
@@ -110,10 +110,6 @@ class Popup(QWidget):
         heading_layout.addLayout(title_row)
 
         # --- header: toolbar row ------------------------------------------
-        self.turtle_btn = QToolButton(autoRaise=True, checkable=True, text="🐢")
-        self.turtle_btn.setToolTip("Turtle mode (alternative speed limits)")
-        self.turtle_btn.toggled.connect(self._on_turtle)
-
         self.search = QLineEdit(placeholderText="Search…", clearButtonEnabled=True)
         self.search.textChanged.connect(self._apply_filter)
         self.search.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -130,8 +126,6 @@ class Popup(QWidget):
 
         toolbar = QHBoxLayout()
         toolbar.setSpacing(4)
-        toolbar.addWidget(self.turtle_btn)
-        toolbar.addSpacing(12)
         toolbar.addWidget(self.search)
         toolbar.addWidget(add_btn)
         heading_layout.addLayout(toolbar)
@@ -279,16 +273,13 @@ class Popup(QWidget):
         self.footer_stats.setText(message)
         self.footer_stats.setToolTip(message)
 
-    def set_data(self, torrents: list[dict], stats: dict, turtle: bool,
+    def set_data(self, torrents: list[dict], stats: dict,
                  free_space: int = -1, server: str = "") -> None:
         if server:
             self.set_server(server)
         self.status_label.setText(
             f'<span style="color:{argb(POSITIVE)}">●</span> Connected')
         self.status_label.setToolTip("")
-        self.turtle_btn.blockSignals(True)
-        self.turtle_btn.setChecked(turtle)
-        self.turtle_btn.blockSignals(False)
 
         current_ids = {t["id"] for t in torrents}
         for tid in [tid for tid in self._rows if tid not in current_ids]:
@@ -396,7 +387,44 @@ class Popup(QWidget):
         else:
             self._selected_ids = {tid}
             self._anchor_id = tid
+        # Every click moves the cursor, Shift-clicks included: arrowing on from
+        # a Shift-clicked row continues from where the click landed.
+        self._cursor_id = tid
         self._apply_selection()
+
+    def step_selection(self, delta: int, extend: bool = False) -> int | None:
+        """Move one visible row up (-1) or down (+1), optionally extending.
+
+        A plain step lands on exactly what a plain click on that row would
+        produce; with `extend` it does what a Shift-click there would — the
+        anchor stays put so the range grows and shrinks instead of ratcheting.
+        Movement stops at the ends rather than wrapping, which is what every
+        list view on both desktops does. With nothing selected, Down starts at
+        the top and Up at the bottom.
+
+        The cursor (the moving end) is tracked separately from the anchor: the
+        two differ the moment a range is extended, and stepping from the anchor
+        would leave Shift+Down stuck one row from it.
+        """
+        order = self._visual_order()
+        if not order:
+            return None
+        cursor = self._cursor_id if self._cursor_id in order else None
+        if cursor is None:
+            selected = [tid for tid in order if tid in self._selected_ids]
+            cursor = selected[-1] if selected else None
+        if cursor is None:
+            tid = order[0] if delta > 0 else order[-1]
+        else:
+            index = min(max(order.index(cursor) + delta, 0), len(order) - 1)
+            tid = order[index]
+        # Same path as a click, so the two can't drift apart. A Shift step with
+        # no usable anchor degrades to a plain click there, as a Shift-click does.
+        self._on_row_clicked(tid, Qt.ShiftModifier if extend else Qt.NoModifier)
+        row = self._rows.get(tid)
+        if row is not None:
+            self.scroll.ensureWidgetVisible(row, 0, 8)
+        return tid
 
     def selected_ids(self) -> list[int]:
         return [tid for tid in self._visual_order() if tid in self._selected_ids]
@@ -535,9 +563,6 @@ class Popup(QWidget):
 
     # --- behaviour ---------------------------------------------------------
 
-    def _on_turtle(self, checked: bool):
-        self.turtle_toggled.emit(checked)
-
     def toggle_near(self, anchor: QRect | None) -> None:
         """Show anchored to the tray icon (when its geometry is known) or to
         the panel corner — the edge the panel occupies is derived from the gap
@@ -589,6 +614,14 @@ class Popup(QWidget):
         self.search.setFocus()
 
     def keyPressEvent(self, event):
+        # Up/Down reach us because a single-line QLineEdit ignores them, so
+        # they bubble out of the search field — the same route Escape takes.
+        if event.key() in (Qt.Key_Up, Qt.Key_Down) and not (
+                event.modifiers() & (Qt.ControlModifier | Qt.AltModifier
+                                     | Qt.MetaModifier)):
+            self.step_selection(1 if event.key() == Qt.Key_Down else -1,
+                                extend=bool(event.modifiers() & Qt.ShiftModifier))
+            return
         if event.key() == Qt.Key_Escape:
             # first Escape clears an active search, second closes the popup
             if self.search.text():

@@ -97,8 +97,13 @@ struct TorrentRowView: View {
     @ViewBuilder
     private var primaryAction: some View {
         if torrent.isComplete {
+            // No confirmation here: the ✕ only appears on a completed torrent,
+            // where removing is cheap and reversible enough not to be worth a
+            // dialog. The expanded-row and context-menu entries (both spelled
+            // with an ellipsis) still confirm, and are the way to delete the
+            // data along with the torrent.
             outlineButton(symbol: "xmark", color: StateColor.negative, help: "Remove torrent") {
-                confirmRemove([torrent.id])
+                store.remove([torrent.id], deleteData: false)
             }
         } else if torrent.isPaused {
             outlineButton(title: "Resume", color: StateColor.positive) {
@@ -130,6 +135,10 @@ struct TorrentRowView: View {
                 RoundedRectangle(cornerRadius: 3)
                     .strokeBorder(stroke.opacity(0.75), lineWidth: 1)
             )
+            // Without this the hit region is the glyph alone — the border is a
+            // stroke and the box inside it is empty, so clicks just short of
+            // the ✕ or the label did nothing and the button felt unreliable.
+            .contentShape(RoundedRectangle(cornerRadius: 3))
         }
         .buttonStyle(.plain)
         .help(help)
