@@ -11,3 +11,6 @@ macos/.build/
 macos/.swiftpm/
 macos/TorrentFlinger.app/
 macos/.env
+
+# Editor-local settings
+.vscode/
