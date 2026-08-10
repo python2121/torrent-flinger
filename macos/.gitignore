@@ -1,0 +1,13 @@
+.build/
+.swiftpm/
+build/
+*.xcodeproj/
+DerivedData/
+TorrentFlinger.app/
+.DS_Store
+.env
+
+# Stray compiler outputs
+*.d
+*.o
+*.swiftdeps

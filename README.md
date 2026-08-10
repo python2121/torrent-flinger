@@ -79,7 +79,7 @@ First run: right-click tray icon → **Options…** → set server → Test Conn
 
 ```
 flinger/core/     RPC client, config, formats — pure stdlib, no Qt.
-                  Shared unchanged with the macOS build.
+                  Ported (not shared) by the Swift build in macos/.
 flinger/ui/       PySide6: popup, expandable rows, details window, dialogs,
                   palette-derived theming (style.py), thread-pool workers,
                   single-instance socket
@@ -87,6 +87,8 @@ packaging/flatpak Flatpak manifest (KDE runtime + PySide BaseApp), metainfo
 tests/            29 tests: mock Transmission RPC server (with the protocol's
                   case-sensitivity quirks encoded), offscreen UI tests,
                   full-app integration test
+macos/            the macOS build — a self-contained Swift package with its
+                  own README, tests and build scripts (see below)
 ```
 
 ```bash
@@ -97,20 +99,22 @@ PYTHONPATH=. .venv/bin/python -m unittest discover tests   # run tests
 The RPC client targets the pre-4.1 protocol (works with Transmission 3.x and
 4.x). Field-name gotchas are documented in `tests/test_core.py`'s mock.
 
-## Porting to macOS
+## macOS
 
-`flinger/core` is Qt-free and `QSystemTrayIcon` becomes a menu-bar item, so:
+The macOS build is a **separate, native Swift/SwiftUI app** in
+[`macos/`](macos/README.md) — a menu-bar accessory with the same feature set,
+rather than this app running under Qt. The two are independent: nothing in
+`macos/` affects the Linux app, and they can coexist in this repo.
 
 ```bash
-python3 -m venv .venv && .venv/bin/pip install PySide6
-PYTHONPATH=. .venv/bin/python -m flinger
+cd macos && ./install.sh
 ```
 
-For magnet-link registration, bundle with PyInstaller and add
-`CFBundleURLTypes` (scheme `magnet`) to the Info.plist, plus a small
-`QEvent.FileOpen` handler in `__main__.py` (macOS delivers URLs as events, not
-argv). The popup's palette-based theming follows the macOS appearance
-automatically.
+They do share one thing on purpose:
+`~/Library/Application Support/torrent-flinger/config.json` uses the same keys
+in both, so the file is interchangeable. `tests/test_core.py` is the shared
+reference for core behavior — formatting, path mapping and TV detection are
+asserted the same way on both sides, so a rule change should land in both.
 
 ## Credits
 

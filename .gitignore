@@ -4,3 +4,10 @@ __pycache__/
 .distrobox-name
 .flatpak-build/
 .flatpak-builder/
+
+# macOS build (see macos/.gitignore for the rest)
+.DS_Store
+macos/.build/
+macos/.swiftpm/
+macos/TorrentFlinger.app/
+macos/.env
