@@ -219,6 +219,24 @@ class PopupTest(unittest.TestCase):
         self.assertEqual(out.mount_local, "/mnt/nas")
         self.assertEqual(out.last_download_dir, "/data/tv")  # carried through
 
+    def test_escape_clears_search_then_closes(self):
+        popup, _ = self.make_popup()
+        popup.show()
+        popup.search.setText("fedora")
+        QTest.keyClick(popup, Qt.Key_Escape)
+        self.assertEqual(popup.search.text(), "")      # first Esc clears search
+        self.assertTrue(popup.isVisible())
+        QTest.keyClick(popup, Qt.Key_Escape)
+        self.assertFalse(popup.isVisible())            # second Esc closes
+        # Esc typed while the search field itself has focus behaves the same
+        popup.show()
+        popup.search.setFocus()
+        popup.search.setText("arch")
+        QTest.keyClick(popup.search, Qt.Key_Escape)
+        self.assertEqual(popup.search.text(), "")
+        self.assertTrue(popup.isVisible())
+        popup.hide()
+
     def test_action_button_modes(self):
         popup, _ = self.make_popup()
         rows = popup._rows

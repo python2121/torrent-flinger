@@ -590,7 +590,11 @@ class Popup(QWidget):
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Escape:
-            self.hide()
+            # first Escape clears an active search, second closes the popup
+            if self.search.text():
+                self.search.clear()
+            else:
+                self.hide()
             return
         super().keyPressEvent(event)
 
