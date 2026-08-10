@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 
 from ..core.config import Config
 from ..core.formats import fmt_size
+from ..core.tvdetect import find_tv_dir, looks_like_tv
 from .style import small_font
 from .worker import run_async
 
@@ -43,11 +44,27 @@ class AddDialog(QDialog):
         self.free_label = QLabel("")
         self.free_label.setFont(small_font())
 
+        # TV auto-detection: preselect the TV folder for names that look like
+        # a show (episode/season markers, air dates, or a known series title)
+        self.tv_hint = QLabel("")
+        self.tv_hint.setFont(small_font())
+        self.tv_hint.hide()
+        is_tv, reason = looks_like_tv(torrent_name)
+        if is_tv:
+            tv_dir = find_tv_dir(config.custom_dirs)
+            index = self.location.findData(tv_dir) if tv_dir else -1
+            if index >= 1:
+                self.location.setCurrentIndex(index)
+                self.tv_hint.setText(f"Looks like a TV show ({reason}) — "
+                                     f"suggested the TV folder")
+                self.tv_hint.show()
+
         self.paused = QCheckBox("Add in paused state")
         self.paused.setChecked(config.start_paused)
 
         form = QFormLayout()
         form.addRow("Save in folder:", self.location)
+        form.addRow("", self.tv_hint)
         form.addRow("", self.free_label)
         form.addRow(self.paused)
 

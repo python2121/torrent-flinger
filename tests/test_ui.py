@@ -306,6 +306,43 @@ class DetailsDialogTest(unittest.TestCase):
         directory, _paused = dialog.result_options()
         self.assertEqual(directory, "/data/tv")
 
+    def test_add_dialog_tv_autodetect(self):
+        from flinger.core.config import Config
+        from flinger.ui.add_dialog import AddDialog
+        cfg = Config(custom_dirs=[{"label": "movies", "dir": "/downloads/movies"},
+                                  {"label": "tv", "dir": "/downloads/tv", "tv": True}],
+                     last_download_dir="/downloads/movies")
+        # TV name → flagged dir wins, even over last-used
+        dialog = AddDialog(cfg, "The.Bear.S03E05.1080p.WEB.h264")
+        self.assertEqual(dialog.location.currentData(), "/downloads/tv")
+        self.assertFalse(dialog.tv_hint.isHidden())
+        # movie name → last-used behavior unchanged, no hint
+        dialog = AddDialog(cfg, "Oppenheimer.2023.1080p.BluRay")
+        self.assertEqual(dialog.location.currentData(), "/downloads/movies")
+        self.assertTrue(dialog.tv_hint.isHidden())
+        # TV name but no dir flagged → default, no hint (labels don't count)
+        cfg2 = Config(custom_dirs=[{"label": "tv", "dir": "/downloads/tv"}])
+        dialog = AddDialog(cfg2, "Severance.S02E01.2160p")
+        self.assertIsNone(dialog.location.currentData())
+        self.assertTrue(dialog.tv_hint.isHidden())
+
+    def test_options_tv_flag_exclusive(self):
+        from PySide6.QtCore import Qt
+
+        from flinger.core.config import Config
+        from flinger.ui.options_dialog import OptionsDialog
+        cfg = Config(custom_dirs=[{"label": "tv", "dir": "/d/tv", "tv": True},
+                                  {"label": "books", "dir": "/d/books"}])
+        dialog = OptionsDialog(cfg)
+        self.assertEqual(dialog.dirs.item(0, 2).checkState(), Qt.CheckState.Checked)
+        # checking another row unchecks the first (radio semantics)
+        dialog.dirs.item(1, 2).setCheckState(Qt.CheckState.Checked)
+        self.assertEqual(dialog.dirs.item(0, 2).checkState(), Qt.CheckState.Unchecked)
+        out = dialog.to_config()
+        self.assertEqual(out.custom_dirs,
+                         [{"label": "tv", "dir": "/d/tv"},
+                          {"label": "books", "dir": "/d/books", "tv": True}])
+
     def test_add_dialog_preselects_last_dir(self):
         from flinger.core.config import Config
         from flinger.ui.add_dialog import AddDialog

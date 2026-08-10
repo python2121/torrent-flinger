@@ -284,6 +284,66 @@ class TestFormats(unittest.TestCase):
         self.assertEqual(link_display_name("/tmp/some%20file.torrent"), "some file.torrent")
 
 
+class TestTVDetect(unittest.TestCase):
+    TV_NAMES = [
+        # episode markers — the workhorse signal
+        ("The.Bear.S03E05.1080p.WEB.h264-ETHEL", "episode"),
+        ("shogun.s01e09.720p.hdtv.x264", "episode"),
+        ("The Wire 3x07 Back Burners", "episode"),
+        ("Severance.S2E1.2160p.ATVP.WEB-DL", "episode"),
+        ("Unknown.Obscure.Show.S01E01.480p", "episode"),  # no list needed
+        # air-date naming (daily shows)
+        ("Last.Week.Tonight.2026.08.03.1080p.WEB", "air-date"),
+        ("The.Daily.Show.2026-01-15.720p.HEVC", "air-date"),
+        # season packs
+        ("True.Detective.S04.2160p.WEB.COMPLETE", "season"),
+        ("Andor.Season.2.1080p.DSNP.WEB-DL", "season"),
+        ("Chernobyl.Complete.Series.1080p.BluRay", "season"),
+        ("Band.of.Brothers.Mini-Series.720p", "season"),
+        ("The.Sopranos.Seasons.1-6.DVDRip", "season"),
+    ]
+    NOT_TV_NAMES = [
+        "Oppenheimer.2023.1080p.BluRay.x264-GROUP",
+        "Fargo.1996.REMASTERED.1080p.BluRay",     # movie/show name collision
+        "Watchmen.2009.Ultimate.Cut.2160p",
+        "Friends.with.Benefits.2011.720p",        # contains a show title
+        "1917.2019.2160p.HDR.REMUX",
+        "2001.A.Space.Odyssey.1968.1080p",
+        "Dune.Part.Two.2024.HDR.2160p",
+        "Inception.1080p.BluRay.x264",
+        "James.Bond.Complete.Collection.1080p",   # pack words alone don't count
+        "Se7en.1995.720p",
+        "Gladiator",
+        # bare show names without markers are intentionally NOT detected —
+        # marker-free packs are rare and title-matching wasn't worth its
+        # false-positive risk (movie/show collisions)
+        "Breaking Bad",
+        "The Wire Complete 1080p",
+    ]
+
+    def test_tv_positives(self):
+        from flinger.core.tvdetect import looks_like_tv
+        for name, expected_reason in self.TV_NAMES:
+            is_tv, reason = looks_like_tv(name)
+            self.assertTrue(is_tv, f"missed TV: {name}")
+            self.assertEqual(reason, expected_reason, name)
+
+    def test_movie_negatives(self):
+        from flinger.core.tvdetect import looks_like_tv
+        for name in self.NOT_TV_NAMES:
+            is_tv, reason = looks_like_tv(name)
+            self.assertFalse(is_tv, f"false positive: {name} ({reason})")
+
+    def test_find_tv_dir(self):
+        from flinger.core.tvdetect import find_tv_dir
+        # explicit flag only — labels/paths don't matter
+        dirs = [{"label": "movies", "dir": "/downloads/movies"},
+                {"label": "junk drawer", "dir": "/downloads/tv", "tv": True}]
+        self.assertEqual(find_tv_dir(dirs), "/downloads/tv")
+        self.assertIsNone(find_tv_dir([{"label": "tv", "dir": "/downloads/tv"}]))
+        self.assertIsNone(find_tv_dir([]))
+
+
 class TestConfig(unittest.TestCase):
     def test_urls(self):
         cfg = Config(host="nas", port=9091)

@@ -1,6 +1,7 @@
 """Settings dialog — mirrors the extension's options.html."""
 from __future__ import annotations
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -9,6 +10,7 @@ from PySide6.QtWidgets import (
     QDoubleSpinBox,
     QFormLayout,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QLineEdit,
     QPushButton,
@@ -35,9 +37,11 @@ class AddDirDialog(QDialog):
         self.setWindowTitle("Add custom directory")
         self.label_edit = QLineEdit(placeholderText="Optional — defaults to folder name")
         self.dir_edit = QLineEdit(placeholderText="Absolute path on the server, e.g. /data/tv")
+        self.tv_check = QCheckBox("Final TV location (auto-suggested for TV shows)")
         form = QFormLayout()
         form.addRow("Label", self.label_edit)
         form.addRow("Directory", self.dir_edit)
+        form.addRow("", self.tv_check)
         buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
         self._save_btn = buttons.button(QDialogButtonBox.Save)
         self._save_btn.setEnabled(False)
@@ -125,12 +129,16 @@ class OptionsDialog(QDialog):
         self.start_paused.setChecked(config.start_paused)
         self.show_dialog = QCheckBox("Show download popup when adding")
         self.show_dialog.setChecked(config.show_add_dialog)
-        self.dirs = QTableWidget(0, 2)
-        self.dirs.setHorizontalHeaderLabels(["Label", "Directory"])
-        self.dirs.horizontalHeader().setStretchLastSection(True)
+        self.dirs = QTableWidget(0, 3)
+        self.dirs.setHorizontalHeaderLabels(["Label", "Directory", "TV?"])
+        self.dirs.horizontalHeader().setStretchLastSection(False)
+        self.dirs.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.dirs.verticalHeader().setVisible(False)
+        self._tv_updating = False
+        self.dirs.itemChanged.connect(self._on_dir_item_changed)
         for entry in config.custom_dirs:
-            self._append_dir(entry.get("label", ""), entry.get("dir", ""))
+            self._append_dir(entry.get("label", ""), entry.get("dir", ""),
+                             tv=bool(entry.get("tv")))
         add_btn = QPushButton("Add…")
         add_btn.clicked.connect(self._add_dir_dialog)
         del_btn = QPushButton("Remove selected")
@@ -222,7 +230,21 @@ class OptionsDialog(QDialog):
             if directory:
                 label = (dialog.label_edit.text().strip()
                          or directory.rstrip("/").rsplit("/", 1)[-1])
-                self._append_dir(label, directory)
+                self._append_dir(label, directory, tv=dialog.tv_check.isChecked())
+
+    def _on_dir_item_changed(self, item):
+        """Only one directory may be the final TV location (radio semantics)."""
+        if (self._tv_updating or item.column() != 2
+                or item.checkState() != Qt.CheckState.Checked):
+            return
+        self._tv_updating = True
+        try:
+            for row in range(self.dirs.rowCount()):
+                other = self.dirs.item(row, 2)
+                if other is not None and other is not item:
+                    other.setCheckState(Qt.CheckState.Unchecked)
+        finally:
+            self._tv_updating = False
 
     def _browse_mount(self):
         from PySide6.QtWidgets import QFileDialog
@@ -260,11 +282,22 @@ class OptionsDialog(QDialog):
             "seedRatioLimited": self.ratio_limited.isChecked(),
         }
 
-    def _append_dir(self, label: str, directory: str):
+    def _append_dir(self, label: str, directory: str, tv: bool = False):
         row = self.dirs.rowCount()
-        self.dirs.insertRow(row)
-        self.dirs.setItem(row, 0, QTableWidgetItem(label))
-        self.dirs.setItem(row, 1, QTableWidgetItem(directory))
+        self._tv_updating = True  # populate without triggering exclusivity
+        try:
+            self.dirs.insertRow(row)
+            self.dirs.setItem(row, 0, QTableWidgetItem(label))
+            self.dirs.setItem(row, 1, QTableWidgetItem(directory))
+            check = QTableWidgetItem()
+            check.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled
+                           | Qt.ItemFlag.ItemIsSelectable)
+            check.setCheckState(Qt.CheckState.Checked if tv else Qt.CheckState.Unchecked)
+            self.dirs.setItem(row, 2, check)
+        finally:
+            self._tv_updating = False
+        if tv:  # enforce exclusivity against any previously-checked row
+            self._on_dir_item_changed(self.dirs.item(row, 2))
 
     def _remove_dir(self):
         rows = sorted({i.row() for i in self.dirs.selectedIndexes()}, reverse=True)
@@ -287,8 +320,12 @@ class OptionsDialog(QDialog):
         for row in range(self.dirs.rowCount()):
             label = (self.dirs.item(row, 0).text() if self.dirs.item(row, 0) else "").strip()
             directory = (self.dirs.item(row, 1).text() if self.dirs.item(row, 1) else "").strip()
+            check = self.dirs.item(row, 2)
             if directory:
-                dirs.append({"label": label, "dir": directory})
+                entry = {"label": label, "dir": directory}
+                if check is not None and check.checkState() == Qt.CheckState.Checked:
+                    entry["tv"] = True
+                dirs.append(entry)
         return Config(
             protocol=self.protocol.currentText(),
             host=self.host.text().strip(),
