@@ -20,6 +20,23 @@ enum UILogicTests {
         return t
     }
 
+    /// `flinger/assets` — the icon set both builds share — found by walking up
+    /// from the working directory, so it resolves whether the suite is run
+    /// from `macos/` (via test.sh) or the repo root.
+    private static func sharedAssetsDirectory() -> URL? {
+        var dir = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        for _ in 0..<5 {
+            let candidate = dir.appendingPathComponent("flinger/assets")
+            var isDir: ObjCBool = false
+            if FileManager.default.fileExists(atPath: candidate.path, isDirectory: &isDir),
+               isDir.boolValue {
+                return candidate
+            }
+            dir = dir.deletingLastPathComponent()
+        }
+        return nil
+    }
+
     static let all: [TestEntry] = [
         TestEntry("grouping/order-and-membership") { t in
             let torrents = [
@@ -157,6 +174,46 @@ enum UILogicTests {
             // At the top edge it clamps, leaving the range as-is.
             shiftArrow(-1)
             t.equal(selection, [5, 1])
+        },
+
+        TestEntry("tray-icon/state-precedence") { t in
+            // A fresh add is a notification, not a status, so it outranks
+            // everything for its three seconds — including a failed server.
+            t.equal(TrayIcon.current(connected: true, downloadSpeed: 0, recentlyAdded: true), .added)
+            t.equal(TrayIcon.current(connected: false, downloadSpeed: 0, recentlyAdded: true), .added)
+            t.equal(TrayIcon.current(connected: true, downloadSpeed: 9000, recentlyAdded: true), .added)
+
+            t.equal(TrayIcon.current(connected: false, downloadSpeed: 0, recentlyAdded: false), .error)
+            t.equal(TrayIcon.current(connected: false, downloadSpeed: 9000, recentlyAdded: false), .error,
+                    "a stale speed from the last good poll must not mask a disconnect")
+
+            t.equal(TrayIcon.current(connected: true, downloadSpeed: 1, recentlyAdded: false), .downloading)
+            t.equal(TrayIcon.current(connected: true, downloadSpeed: 0, recentlyAdded: false), .idle)
+        },
+
+        TestEntry("tray-icon/seeding-only-is-idle-not-downloading") { t in
+            // The glyph is a down arrow; showing it while only uploading would
+            // be a lie, so upload activity deliberately doesn't reach it.
+            t.equal(TrayIcon.current(connected: true, downloadSpeed: 0, recentlyAdded: false), .idle)
+        },
+
+        TestEntry("tray-icon/assets-exist-for-every-state") { t in
+            // A missing file silently falls back to an SF Symbol, so without
+            // this the artwork could go absent and only show up by eye.
+            // SwiftPM compiles with remapped, relative #filePath, so the
+            // source location can't locate the repo — walk up from the working
+            // directory instead.
+            guard let dir = Self.sharedAssetsDirectory() else {
+                return t.fail("couldn't locate flinger/assets from \(FileManager.default.currentDirectoryPath)")
+            }
+            for icon in TrayIcon.allCases {
+                let svg = dir.appendingPathComponent("\(icon.assetName).svg")
+                t.expect(FileManager.default.fileExists(atPath: svg.path),
+                         "missing shared asset \(icon.assetName).svg")
+                t.expect(!icon.fallbackSymbol.isEmpty, "every state needs a dev-loop fallback")
+            }
+            t.equal(TrayIcon.allCases.count, 4)
+            t.equal(TrayIcon.addedDuration, 3, "must match ADDED_DURATION_S on the Linux side")
         },
 
         TestEntry("custom-dirs/tv-flag-is-exclusive") { t in

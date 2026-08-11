@@ -64,6 +64,13 @@ cp "${BIN_PATH}" "${APP_DIR}/Contents/MacOS/${APP_NAME}"
 # the app just falls back to the generic bundle icon.
 ICON_PLIST_ENTRY=""
 ASSETS="../flinger/assets"
+
+# Menu-bar state glyphs. Monochrome SVG, shared verbatim with the Linux tray —
+# AppKit tints them via isTemplate, Qt tints them by hand. Copied rather than
+# compiled so both builds read exactly the same files.
+for glyph in "${ASSETS}"/tray-*.svg; do
+  [[ -f "$glyph" ]] && cp "$glyph" "${APP_DIR}/Contents/Resources/"
+done
 if [[ -f "${ASSETS}/icon128.png" ]] && command -v iconutil >/dev/null 2>&1; then
   ICONSET="$(mktemp -d)/AppIcon.iconset"
   mkdir -p "${ICONSET}"

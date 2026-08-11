@@ -201,6 +201,14 @@ break the other target.
   `ids: nil` means "all torrents" and an empty array must stay a no-op — the
   difference between pausing nothing and pausing everything. There are tests
   for it; keep them.
+- **The tray artwork is shared with the Linux build, so changes are paired.**
+  `flinger/assets/tray-{idle,downloading,error,added}.svg` is one monochrome set
+  consumed by both: `build-app.sh` copies it into the bundle, `flinger/ui/style.py`
+  tints it for Qt. The selection rules are duplicated deliberately —
+  `Core/TrayIcon.swift` and `flinger/core/trayicon.py` — with matching tests on
+  both sides, including one asserting the 3 s "added" duration is the same
+  number in both. Keep them in step. Monochrome is a requirement, not a style
+  choice: colour can't adapt to a dark panel or a tinted menu bar.
 - **Ad-hoc signing is fine here** (unlike ClaudeUsage, where a stable identity
   is required for Keychain ACLs). Apple's TN3179 warns that local-network
   identity keys off the code signature plus the main executable's UUID, and

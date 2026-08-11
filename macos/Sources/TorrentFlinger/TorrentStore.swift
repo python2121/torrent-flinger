@@ -34,6 +34,12 @@ final class TorrentStore: ObservableObject {
     /// been told to stop offering) yet — drives the popover's clipboard banner.
     @Published var clipboardOffer: String?
 
+    /// True for `TrayIcon.addedDuration` after a torrent is accepted, which is
+    /// what puts the "+" in the menu bar. A notification rather than a status,
+    /// so it outranks everything else while it lasts.
+    @Published private(set) var recentlyAdded = false
+    private var addedExpiry: DispatchWorkItem?
+
     private(set) var client: TransmissionClient
 
     /// Server's default download dir plus the resolved remote prefix, used for
@@ -319,6 +325,17 @@ final class TorrentStore: ObservableObject {
 
     /// Add a magnet URI or a local `.torrent` path, announcing the outcome the
     /// way the Linux tray does.
+    /// Flash the "added" glyph. Re-adding within the window restarts the clock
+    /// rather than stacking timers, so a batch of dropped files shows one
+    /// continuous "+" instead of flickering.
+    private func flashAdded() {
+        addedExpiry?.cancel()
+        recentlyAdded = true
+        let expiry = DispatchWorkItem { [weak self] in self?.recentlyAdded = false }
+        addedExpiry = expiry
+        DispatchQueue.main.asyncAfter(deadline: .now() + TrayIcon.addedDuration, execute: expiry)
+    }
+
     func add(link: String, downloadDir: String?, paused: Bool) {
         let client = self.client
         let fallbackName = Format.linkDisplayName(link)
@@ -332,6 +349,9 @@ final class TorrentStore: ObservableObject {
                         Notifier.post(title: title,
                                       body: outcome.name.isEmpty ? fallbackName : outcome.name)
                     }
+                    // Only a genuinely new torrent flashes the "+". A duplicate
+                    // changed nothing, so claiming otherwise would be a lie.
+                    if outcome.kind == .added { self?.flashAdded() }
                     self?.poll()
                 }
             } catch {

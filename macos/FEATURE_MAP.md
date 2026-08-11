@@ -78,6 +78,35 @@ a POSIX file lock.
   (`torrent-set`, `session-set`) with literal conformances; responses decode
   into concrete types. `Core/JSONValue.swift`
 
+### Tray / menu-bar icon
+
+- **Four shared states** — `TrayIcon.current(connected:downloadSpeed:recentlyAdded:)`
+  picks between a horseshoe magnet (idle), a down arrow (downloading), an
+  exclamation mark (error) and a plus (just added). Precedence: a fresh add
+  wins for three seconds because it's a *notification* rather than a status,
+  then disconnection, then transfer activity, then idle. "Downloading" keys off
+  download speed alone — a seeding-only session shows the magnet, because a
+  down arrow would be a lie. The Linux build implements the identical rules in
+  `flinger/core/trayicon.py`; both are tested.
+  `Core/TrayIcon.swift`
+- **One monochrome artwork set for both builds** — `flinger/assets/tray-*.svg`,
+  copied into the bundle's Resources by `build-app.sh` and read directly by the
+  Linux tray. Monochrome so each OS can tint it: AppKit does it for free via
+  `isTemplate` (adapting to light/dark, a tinted menu bar, and the inverted
+  highlight while the panel is open); Qt has no equivalent, so the Linux side
+  composites the palette colour through the alpha by hand. Drawn to fill ~82%
+  of the 16pt box — a first cut at 65% read visibly lighter than the system
+  icons either side of it. `AppDelegate.trayImage`, `flinger/ui/style.py`
+- **Dev-loop fallback** — `swift run` has no bundle to load resources from, so
+  a missing asset falls back to an SF Symbol per state rather than showing a
+  blank menu bar. Because that fallback is silent, a test asserts every state's
+  SVG actually exists. `Core/TrayIcon.swift`, `SelfTest/UILogicTests.swift`
+- **Transient "added" flash** — `TorrentStore.flashAdded()` sets
+  `recentlyAdded` for `TrayIcon.addedDuration` (3 s) when a torrent is
+  *newly* accepted; a duplicate doesn't flash, since nothing changed. A second
+  add inside the window restarts the clock rather than stacking timers, so a
+  batch of dropped files reads as one continuous "+". `TorrentStore.swift`
+
 ### Networking permissions
 
 - **Local Network permission bootstrap** — macOS gates connections to LAN

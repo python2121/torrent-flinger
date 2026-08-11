@@ -6,12 +6,13 @@ from pathlib import Path
 from urllib.parse import unquote, urlparse
 
 from PySide6.QtCore import QObject, Qt, QTimer
-from PySide6.QtGui import QAction, QIcon
+from PySide6.QtGui import QAction, QIcon, QPalette
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 from ..core.config import Config
 from ..core.formats import common_remote_root, fmt_speed, link_display_name
 from ..core.transmission import TransmissionClient, TransmissionError
+from ..core.trayicon import ADDED_DURATION_S, tray_icon
 from .add_dialog import AddDialog
 from .options_dialog import OptionsDialog
 from .popup import Popup
@@ -31,6 +32,10 @@ class FlingerApp(QObject):
         self.client = TransmissionClient.from_config(self.config)
         self._polling = False
         self._finished_ids: set[int] | None = None  # None until first successful poll
+        self._recently_added = False
+        self._tray_state: str | None = None
+        self._last_connected = False
+        self._last_download_speed = 0
 
         icon = QIcon(str(ASSETS / "icon128.png"))
         qapp.setWindowIcon(icon)
@@ -84,6 +89,7 @@ class FlingerApp(QObject):
         menu.addAction(QAction("Quit", menu, triggered=qapp.quit))
         self.tray.setContextMenu(menu)
         self.tray.show()
+        self._update_tray_icon(connected=False, download_speed=0)
 
         self.instance_server = InstanceServer(self)
         self.instance_server.link_received.connect(self.handle_link)
@@ -145,6 +151,8 @@ class FlingerApp(QObject):
         self.popup.set_data(torrents, stats,
                             free_space=data.get("free_space", -1),
                             server=self.config.host)
+        self._update_tray_icon(connected=True,
+                               download_speed=stats.get("downloadSpeed", 0))
         self.tray.setToolTip(
             f"Torrent Flinger — {len(torrents)} torrents\n"
             f"DL: {fmt_speed(stats.get('downloadSpeed', 0))}  "
@@ -161,7 +169,49 @@ class FlingerApp(QObject):
     def _on_poll_error(self, message):
         self._polling = False
         self.popup.set_error(f"Can't reach {self.config.host} — {message}")
+        self._update_tray_icon(connected=False, download_speed=0)
         self.tray.setToolTip(f"Torrent Flinger — connection failed:\n{message}")
+
+    # -- tray icon ------------------------------------------------------------
+
+    def _update_tray_icon(self, connected: bool, download_speed: int) -> None:
+        """Pick the glyph and tint it for the current panel colours.
+
+        Re-tinted on every poll rather than cached against a theme, so a
+        Breeze light/dark switch is picked up within one interval. Skipped when
+        the state hasn't changed, so this stays a no-op in the steady case.
+        """
+        # Remembered so the "added" timer can restore the real state when it
+        # expires without waiting for the next poll.
+        self._last_connected = connected
+        self._last_download_speed = download_speed
+
+        state = tray_icon(connected, download_speed, self._recently_added)
+        if state == self._tray_state:
+            return
+        from .style import tray_pixmap
+        color = self.qapp.palette().color(QPalette.WindowText)
+        pixmap = tray_pixmap(state, color, size=22,
+                             dpr=self.qapp.devicePixelRatio())
+        if pixmap.isNull():
+            return  # QtSvg unavailable — keep the raster icon we started with
+        self._tray_state = state
+        self.tray.setIcon(QIcon(pixmap))
+
+    def _flash_added(self) -> None:
+        """Show the "+" for a few seconds, then fall back to the real state.
+        A second add inside the window restarts the clock rather than stacking
+        timers, so a batch of dropped files reads as one continuous "+"."""
+        self._recently_added = True
+        self._update_tray_icon(connected=True,
+                               download_speed=self._last_download_speed)
+
+        def expire():
+            self._recently_added = False
+            self._update_tray_icon(connected=self._last_connected,
+                                   download_speed=self._last_download_speed)
+
+        QTimer.singleShot(int(ADDED_DURATION_S * 1000), expire)
 
     def _action(self, fn):
         run_async(fn, on_done=lambda _: self._poll(),
@@ -200,6 +250,10 @@ class FlingerApp(QObject):
                 title = "Torrent added" if status == "added" else "Already in Transmission"
                 self.tray.showMessage(title, info.get("name", name),
                                       QSystemTrayIcon.Information, 4000)
+            # Only a genuinely new torrent flashes the "+". A duplicate changed
+            # nothing, so claiming otherwise would be a lie.
+            if status == "added":
+                self._flash_added()
             self._poll()
 
         run_async(add, on_done=on_done,

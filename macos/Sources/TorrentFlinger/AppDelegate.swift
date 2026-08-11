@@ -487,26 +487,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: Menubar item
 
+    /// Menu-bar height for the state glyph. The bar gives ~18pt; 16 leaves the
+    /// optical breathing room the system's own icons have.
+    private static let trayIconSize: CGFloat = 16
+
+    private static var trayImageCache: [TrayIcon: NSImage] = [:]
+
+    /// The state glyph, loaded from the SVG shared with the Linux build.
+    ///
+    /// `isTemplate` is what makes one monochrome asset work everywhere: AppKit
+    /// throws the colour away and re-renders the silhouette, so it adapts to
+    /// light/dark, to a tinted menu bar, and inverts while the panel is open.
+    /// Qt has no equivalent, so the Linux build tints the same file by hand.
+    ///
+    /// Falls back to an SF Symbol when the asset is missing — that's the
+    /// `swift run` dev loop, which has no bundle to load resources from.
+    private static func trayImage(_ icon: TrayIcon, described: String?) -> NSImage? {
+        if let cached = trayImageCache[icon] { return cached }
+
+        let image: NSImage?
+        if let url = Bundle.main.url(forResource: icon.assetName, withExtension: "svg"),
+           let loaded = NSImage(contentsOf: url) {
+            loaded.size = NSSize(width: trayIconSize, height: trayIconSize)
+            image = loaded
+        } else {
+            image = NSImage(systemSymbolName: icon.fallbackSymbol,
+                            accessibilityDescription: described ?? icon.rawValue)
+        }
+        image?.isTemplate = true
+        image?.accessibilityDescription = described ?? icon.rawValue
+        if let image { trayImageCache[icon] = image }
+        return image
+    }
+
     /// Icon + (optionally) the aggregate speeds. The Linux build puts this in
     /// the tray tooltip; a menu bar has room for the numbers themselves, so the
     /// interesting state is visible without clicking.
     private func updateStatusItem() {
         guard let button = statusItem.button else { return }
 
-        let symbol: String
-        let describedState: String
-        if !store.connected {
-            symbol = "exclamationmark.triangle"
-            describedState = store.errorMessage ?? "Disconnected"
-        } else if store.stats.downloadSpeed > 0 || store.stats.uploadSpeed > 0 {
-            symbol = "arrow.down.circle.fill"
-            describedState = "Active"
-        } else {
-            symbol = "arrow.down.circle"
-            describedState = "Idle"
-        }
-        button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: describedState)
-        button.image?.isTemplate = true
+        let icon = TrayIcon.current(connected: store.connected,
+                                    downloadSpeed: store.stats.downloadSpeed,
+                                    recentlyAdded: store.recentlyAdded)
+        button.image = Self.trayImage(icon, described: store.errorMessage)
         button.imagePosition = .imageLeading
 
         var title = ""

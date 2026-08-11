@@ -390,3 +390,36 @@ class TestConfig(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestTrayIcon(unittest.TestCase):
+    """Tray glyph selection. The macOS build implements the same four states
+    and the same precedence in macos/.../Core/TrayIcon.swift — when a rule
+    changes here, change it there and in UILogicTests.swift."""
+
+    def test_precedence(self):
+        from flinger.core.trayicon import ADDED, DOWNLOADING, ERROR, IDLE, tray_icon
+        # A fresh add is a notification, not a status, so it outranks
+        # everything for its three seconds — including a failed server.
+        self.assertEqual(tray_icon(True, 0, True), ADDED)
+        self.assertEqual(tray_icon(False, 0, True), ADDED)
+        self.assertEqual(tray_icon(True, 9000, True), ADDED)
+
+        self.assertEqual(tray_icon(False, 0, False), ERROR)
+        # A stale speed from the last good poll must not mask a disconnect.
+        self.assertEqual(tray_icon(False, 9000, False), ERROR)
+
+        self.assertEqual(tray_icon(True, 1, False), DOWNLOADING)
+        # The glyph is a down arrow; a seeding-only session shows the magnet.
+        self.assertEqual(tray_icon(True, 0, False), IDLE)
+
+    def test_assets_exist_for_every_state(self):
+        from pathlib import Path
+        from flinger.core.trayicon import ADDED_DURATION_S, STATES, asset_name
+        assets = Path(__file__).resolve().parent.parent / "flinger" / "assets"
+        for state in STATES:
+            svg = assets / f"{asset_name(state)}.svg"
+            self.assertTrue(svg.is_file(), f"missing shared asset {svg.name}")
+        self.assertEqual(len(STATES), 4)
+        # Must match TrayIcon.addedDuration on the macOS side.
+        self.assertEqual(ADDED_DURATION_S, 3.0)

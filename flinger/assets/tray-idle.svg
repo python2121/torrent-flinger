@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
+  <!-- Horseshoe magnet, monochrome, drawn as an alpha mask: macOS tints it via
+       isTemplate, KDE tints it against the panel foreground.
+       Squarer shoulders and oversized pole faces are deliberate — at menu-bar
+       size a semicircular arch reads as an "n", and the classic banded-pole
+       look (a thin gap across the legs) collapses into a grey smear once
+       rasterised that small. The artwork fills ~82% of the box because the
+       first cut filled 65% and read visibly lighter than the system icons
+       either side of it. The pole faces are centred on the legs and
+       deliberately overhang them — a narrower foot reads as an arch. -->
+  <g fill="none" stroke="#000" stroke-width="2.8" stroke-linecap="butt">
+    <path d="M3.2 11 L3.2 5.6 Q3.2 2.4 8 2.4 Q12.8 2.4 12.8 5.6 L12.8 11"/>
+  </g>
+  <rect x="1.1" y="11" width="4.2" height="3.2" fill="#000"/>
+  <rect x="10.7" y="11" width="4.2" height="3.2" fill="#000"/>
+</svg>

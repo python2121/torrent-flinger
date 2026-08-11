@@ -86,6 +86,48 @@ def state_pixmap(palette: QPalette, state: str, size: int = 32, dpr: float = 1.0
     return px
 
 
+_tray_cache: dict[tuple, QPixmap] = {}
+
+
+def tray_pixmap(state: str, color: QColor, size: int = 22, dpr: float = 1.0) -> QPixmap:
+    """Tray glyph for `state`, tinted to `color`.
+
+    The four `tray-*.svg` files in flinger/assets are monochrome silhouettes
+    shared verbatim with the macOS build. macOS gets this for free by marking
+    the image as a template; Qt has no equivalent, so we render the SVG and
+    then composite the colour through its alpha (SourceIn). Without that a
+    black glyph would be invisible on a dark Plasma panel.
+
+    Falls back to an empty pixmap if QtSvg is unavailable, so the caller can
+    detect it and keep the old raster icon.
+    """
+    key = (state, color.rgba(), size, round(dpr * 4))
+    if key in _tray_cache:
+        return _tray_cache[key]
+
+    from pathlib import Path
+    path = Path(__file__).resolve().parent.parent / "assets" / f"tray-{state}.svg"
+    px = QPixmap(int(size * dpr), int(size * dpr))
+    px.setDevicePixelRatio(dpr)
+    px.fill(Qt.transparent)
+    try:
+        from PySide6.QtSvg import QSvgRenderer
+    except ImportError:  # QtSvg not in this PySide6 build
+        return px
+    renderer = QSvgRenderer(str(path))
+    if not renderer.isValid():
+        return px
+
+    p = QPainter(px)
+    p.setRenderHint(QPainter.Antialiasing)
+    renderer.render(p)
+    p.setCompositionMode(QPainter.CompositionMode_SourceIn)
+    p.fillRect(px.rect(), color)
+    p.end()
+    _tray_cache[key] = px
+    return px
+
+
 def small_font() -> QFont:
     return QFontDatabase.systemFont(QFontDatabase.SmallestReadableFont)
 
