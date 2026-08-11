@@ -415,6 +415,7 @@ class TestTrayIcon(unittest.TestCase):
 
     def test_assets_exist_for_every_state(self):
         from pathlib import Path
+
         from flinger.core.trayicon import ADDED_DURATION_S, STATES, asset_name
         assets = Path(__file__).resolve().parent.parent / "flinger" / "assets"
         for state in STATES:
