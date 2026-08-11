@@ -201,6 +201,25 @@ enum UILogicTests {
             t.equal(TrayIcon.current(connected: true, downloadSpeed: 0, recentlyAdded: false), .idle)
         },
 
+        TestEntry("tray-icon/download-arrow-yields-to-the-speed-readout") { t in
+            // macOS only: while downloading the arrow just repeats what "↓1.2M"
+            // already says, so the numbers stand alone.
+            t.equal(TrayIcon.downloading.showsGlyph(speedsVisible: true), false)
+
+            // …but only when there are numbers to stand in for it. With speeds
+            // switched off in Options, dropping the glyph would leave the
+            // status item completely empty.
+            t.equal(TrayIcon.downloading.showsGlyph(speedsVisible: false), true)
+
+            // Every other state keeps its glyph either way — they carry
+            // information the speed text doesn't.
+            for icon in TrayIcon.allCases where icon != .downloading {
+                t.equal(icon.showsGlyph(speedsVisible: true), true,
+                        "\(icon.rawValue) must stay visible alongside the speeds")
+                t.equal(icon.showsGlyph(speedsVisible: false), true)
+            }
+        },
+
         TestEntry("tray-icon/seeding-only-is-idle-not-downloading") { t in
             // The glyph is a down arrow; showing it while only uploading would
             // be a lie, so upload activity deliberately doesn't reach it.

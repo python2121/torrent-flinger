@@ -24,6 +24,21 @@ enum TrayIcon: String, CaseIterable {
     /// Asset basename, shared with the Linux build.
     var assetName: String { "tray-\(rawValue)" }
 
+    /// Whether the menu bar draws the glyph, given whether the live speeds are
+    /// showing beside it.
+    ///
+    /// **macOS only** — the Linux tray has no text label (`QSystemTrayIcon`
+    /// offers icon, tooltip and menu, nothing else), so it always draws the
+    /// glyph and `flinger/core/trayicon.py` has no equivalent of this.
+    ///
+    /// While downloading, the arrow says exactly what `↓1.2M` already says, so
+    /// it's dropped and the numbers stand alone. Every other state keeps its
+    /// glyph, and so does downloading when speeds are switched off — otherwise
+    /// the status item would render completely empty.
+    func showsGlyph(speedsVisible: Bool) -> Bool {
+        !(self == .downloading && speedsVisible)
+    }
+
     /// Stand-in when the bundled asset can't be loaded — i.e. the `swift run`
     /// dev loop, which has no bundle. Close enough to keep the dev build
     /// legible without pretending to be the real artwork.

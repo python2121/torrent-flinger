@@ -533,8 +533,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let icon = TrayIcon.current(connected: store.connected,
                                     downloadSpeed: store.stats.downloadSpeed,
                                     recentlyAdded: store.recentlyAdded)
-        button.image = Self.trayImage(icon, described: store.errorMessage)
-        button.imagePosition = .imageLeading
 
         var title = ""
         if store.config.menubarShowSpeeds, store.connected {
@@ -547,10 +545,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             title = parts.joined(separator: " ")
         }
+
+        // The speeds are computed first because they decide whether the glyph
+        // is drawn at all: while downloading, the arrow only repeats what the
+        // numbers say.
+        if icon.showsGlyph(speedsVisible: !title.isEmpty) {
+            button.image = Self.trayImage(icon, described: store.errorMessage)
+            button.imagePosition = .imageLeading
+        } else {
+            button.image = nil
+            button.imagePosition = .noImage
+        }
+
         let font = NSFont.monospacedDigitSystemFont(
             ofSize: NSFont.menuBarFont(ofSize: 0).pointSize - 2, weight: .medium)
+        // No leading space when the numbers stand alone — that padding only
+        // exists to separate them from the glyph.
+        let spacer = button.imagePosition == .noImage ? "" : " "
         button.attributedTitle = NSAttributedString(
-            string: title.isEmpty ? "" : " \(title)",
+            string: title.isEmpty ? "" : "\(spacer)\(title)",
             attributes: [.font: font, .foregroundColor: NSColor.labelColor])
 
         if store.connected {
