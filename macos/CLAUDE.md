@@ -195,6 +195,17 @@ break the other target.
   context menu computes its targets purely (selection if the row is in it, else
   just that row) rather than selecting on right-click, specifically to avoid
   "modifying state during view update".
+- **The popover list's row identity includes its section, and its sections are
+  a struct rather than a tuple.** Both matter, and getting either wrong shows up
+  as a row that keeps drawing its old state until the panel is reopened — the
+  torrent errors out, moves into the Error section, and stays blue with its old
+  speed subtitle. A torrent that changes state changes section, so for one
+  update the list holds both the old row and the new one: identified by torrent
+  id alone the two collide and SwiftUI keeps the stale view, and `ForEach` over
+  `(name:, torrents:)` tuples can't tell that a section's contents changed
+  because tuples aren't `Equatable`. Reproduce by leaving the popover open and
+  running `torrent-start`/`torrent-stop` over RPC from another shell; the row's
+  `body` re-runs with the right data either way, so only the pixels tell you.
 - `Notifier` is gated on being a real `.app` bundle:
   `UNUserNotificationCenter.current()` traps otherwise, which is exactly the
   `swift run` dev loop. Keep the guard.

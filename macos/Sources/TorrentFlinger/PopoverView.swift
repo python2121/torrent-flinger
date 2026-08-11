@@ -14,6 +14,15 @@ struct PopoverActions {
     var quit: () -> Void = {}
 }
 
+/// One status section of the list. A named struct rather than the `(name:,
+/// torrents:)` tuple `TorrentStore.groups` hands back, because `ForEach` needs
+/// an `Equatable` element to notice that a section's contents changed.
+struct GroupItem: Identifiable, Equatable {
+    let name: String
+    let torrents: [Torrent]
+    var id: String { name }
+}
+
 /// The tray popup, ported from `flinger/ui/popup.py` and dressed in the
 /// ClaudeUsage panel's visual language: header strip (title row + toolbar with
 /// search and add button), status-grouped torrent list with expandable rows,
@@ -150,18 +159,27 @@ struct PopoverView: View {
 
     @ViewBuilder
     private var list: some View {
-        let groups = store.groups
+        let groups = store.groups.map { GroupItem(name: $0.name, torrents: $0.torrents) }
         if groups.isEmpty {
             placeholder
         } else {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 2) {
-                        ForEach(groups, id: \.name) { group in
+                        ForEach(groups) { group in
                             sectionHeader(group.name, count: group.torrents.count)
                             ForEach(group.torrents) { torrent in
                                 TorrentRowView(store: store, torrent: torrent, actions: actions)
-                                    .id(torrent.id)
+                                    // A row's identity has to carry its section
+                                    // too. A torrent that changes state moves
+                                    // between sections, and for that update the
+                                    // list holds both the old row and the new
+                                    // one; identified by torrent id alone those
+                                    // two collide, and SwiftUI keeps drawing the
+                                    // stale one — a torrent that errored out
+                                    // stayed blue with its old subtitle until
+                                    // the panel was reopened.
+                                    .id(Self.rowID(group: group.name, torrent: torrent.id))
                             }
                         }
                     }
@@ -172,15 +190,22 @@ struct PopoverView: View {
                 .scrollBounceBehavior(.basedOnSize)
                 // Keyboard navigation can land on a row that's scrolled off;
                 // the store asks for it here and we clear the request so the
-                // next press on the same row scrolls again.
+                // next press on the same row scrolls again. The row is asked
+                // for by torrent id, so find the section it currently sits in
+                // to rebuild the composite id the row is registered under.
                 .onChange(of: store.scrollTarget) { _, target in
                     guard let target else { return }
-                    proxy.scrollTo(target)
+                    if let group = groups.first(where: { $0.torrents.contains { $0.id == target } }) {
+                        proxy.scrollTo(Self.rowID(group: group.name, torrent: target))
+                    }
                     store.clearScrollTarget()
                 }
             }
         }
     }
+
+    /// Scroll/identity key for one row: section plus torrent id.
+    static func rowID(group: String, torrent: Int) -> String { "\(group)#\(torrent)" }
 
     /// Plasma's `ListSectionHeader`: a small caption with a rule running to the
     /// right edge.
