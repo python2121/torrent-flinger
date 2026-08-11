@@ -20,8 +20,8 @@ final class TorrentStore: ObservableObject {
     @Published private(set) var lastUpdated: Date?
     @Published private(set) var config: Config
 
-    /// Live search text. Also the Escape target: the first Escape clears it,
-    /// the second closes the panel.
+    /// Live search text. One of the Escape targets: with nothing selected an
+    /// Escape clears it, and a further one closes the panel.
     @Published var searchText = ""
     @Published var selectedIDs: Set<Int> = []
     @Published var expandedIDs: Set<Int> = []
@@ -107,9 +107,7 @@ final class TorrentStore: ObservableObject {
         } else {
             // Selection and expansion are per-viewing state; a reopened panel
             // should look freshly opened rather than resuming a stale session.
-            selectedIDs.removeAll()
-            anchorID = nil
-            cursorID = nil
+            clearSelection()
         }
     }
 
@@ -279,6 +277,14 @@ final class TorrentStore: ObservableObject {
 
     /// Consumed by the list once it has scrolled the row into view.
     func clearScrollTarget() { scrollTarget = nil }
+
+    /// Drop the selection along with the anchor and cursor that go with it, so
+    /// the next arrow key starts from the top (Down) or bottom (Up) again.
+    func clearSelection() {
+        selectedIDs.removeAll()
+        anchorID = nil
+        cursorID = nil
+    }
 
     /// A right-click acts on the selection when the clicked row is part of it,
     /// otherwise it selects that row first — standard list-view behavior.

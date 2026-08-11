@@ -429,6 +429,14 @@ class Popup(QWidget):
     def selected_ids(self) -> list[int]:
         return [tid for tid in self._visual_order() if tid in self._selected_ids]
 
+    def clear_selection(self) -> None:
+        """Drop the selection along with the anchor and cursor that go with it,
+        so the next arrow key starts from the top (Down) or bottom (Up) again."""
+        self._selected_ids.clear()
+        self._anchor_id = None
+        self._cursor_id = None
+        self._apply_selection()
+
     def _on_row_context(self, tid: int, global_pos):
         if tid not in self._selected_ids:
             self._selected_ids = {tid}
@@ -623,8 +631,15 @@ class Popup(QWidget):
                                 extend=bool(event.modifiers() & Qt.ShiftModifier))
             return
         if event.key() == Qt.Key_Escape:
-            # first Escape clears an active search, second closes the popup
-            if self.search.text():
+            # Escape peels back one layer of transient state per press:
+            # selection first (the lightest, most recently made), then the
+            # search filter, and only then the popup itself. The test is the
+            # *visible* selection, so a press always changes something on
+            # screen — rows the filter has hidden are cleared with the search
+            # they're hiding behind, one press later.
+            if self.selected_ids():
+                self.clear_selection()
+            elif self.search.text():
                 self.search.clear()
             else:
                 self.hide()

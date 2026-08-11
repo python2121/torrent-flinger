@@ -118,6 +118,16 @@ enum UILogicTests {
                     [99], "clicking a row that isn't in the order still selects it")
         },
 
+        TestEntry("selection/escape-peels-one-layer-per-press") { t in
+            // Selection outranks the search field, so a filtered multi-select
+            // takes three presses to get from "busy" to "closed".
+            t.equal(Selection.escape(hasSelection: true, hasSearch: true), .clearSelection)
+            t.equal(Selection.escape(hasSelection: true, hasSearch: false), .clearSelection)
+            t.equal(Selection.escape(hasSelection: false, hasSearch: true), .clearSearch)
+            t.equal(Selection.escape(hasSelection: false, hasSearch: false), .close,
+                    "nothing left to clear → the panel closes")
+        },
+
         TestEntry("selection/arrow-keys-walk-the-visual-order") { t in
             // Again deliberately not id-sorted: arrows follow what's on screen.
             let order = [5, 1, 4, 2, 3]

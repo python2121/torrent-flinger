@@ -188,8 +188,9 @@ break the other target.
 - The panel is a borderless `NSPanel`, not an `NSPopover` — same reasoning as
   ClaudeUsage: it sidesteps `NSPopover`'s anchor-rect mis-placement, and a
   `.nonactivatingPanel` that `canBecomeKey` lets the search field take
-  keystrokes without activating the app. Escape clears an active search first
-  and closes the panel second, matching the Linux popup.
+  keystrokes without activating the app. Escape peels back one layer per press
+  — selection, then an active search, then the panel — matching the Linux popup
+  (the order lives in `Selection.escape`).
 - Don't mutate `@Published` state while building a view. `TorrentRowView`'s
   context menu computes its targets purely (selection if the row is in it, else
   just that row) rather than selecting on right-click, specifically to avoid

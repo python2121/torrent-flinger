@@ -50,6 +50,22 @@ enum Selection {
         }
     }
 
+    /// What one Escape press should do.
+    enum EscapeStep {
+        case clearSelection
+        case clearSearch
+        case close
+    }
+
+    /// Escape peels back one layer of transient state per press: selection
+    /// first (the lightest, most recently made), then the search filter, and
+    /// only then the panel itself. Same order as the Linux popup.
+    static func escape(hasSelection: Bool, hasSearch: Bool) -> EscapeStep {
+        if hasSelection { return .clearSelection }
+        if hasSearch { return .clearSearch }
+        return .close
+    }
+
     /// The row an Up (`direction` -1) or Down (+1) keypress lands on, or nil
     /// when the list is empty.
     ///

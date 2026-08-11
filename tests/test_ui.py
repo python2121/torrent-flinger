@@ -241,6 +241,48 @@ class PopupTest(unittest.TestCase):
         self.assertTrue(popup.isVisible())
         popup.hide()
 
+    def test_escape_clears_selection_first(self):
+        popup, _ = self.make_popup()
+        popup.show()
+        popup.search.setText("iso")                    # matches every row
+        popup._on_row_clicked(1, Qt.NoModifier)
+        popup._on_row_clicked(2, Qt.ControlModifier)
+        self.assertEqual(sorted(popup.selected_ids()), [1, 2])
+
+        QTest.keyClick(popup, Qt.Key_Escape)           # selection goes first…
+        self.assertEqual(popup.selected_ids(), [])
+        self.assertFalse(popup._rows[1].is_selected)
+        self.assertEqual(popup.search.text(), "iso")   # …search survives it
+        self.assertTrue(popup.isVisible())
+
+        QTest.keyClick(popup, Qt.Key_Escape)           # …then the search…
+        self.assertEqual(popup.search.text(), "")
+        self.assertTrue(popup.isVisible())
+
+        QTest.keyClick(popup, Qt.Key_Escape)           # …then the popup itself
+        self.assertFalse(popup.isVisible())
+
+        # A selection the filter has hidden doesn't swallow a press: the search
+        # goes first, bringing the still-selected rows back into view.
+        popup.show()
+        popup._on_row_clicked(1, Qt.NoModifier)        # ubuntu.iso
+        popup.search.setText("arch")                   # …now hidden
+        self.assertEqual(popup.selected_ids(), [])
+        QTest.keyClick(popup, Qt.Key_Escape)
+        self.assertEqual(popup.search.text(), "")
+        self.assertEqual(popup.selected_ids(), [1])
+        QTest.keyClick(popup, Qt.Key_Escape)
+        self.assertEqual(popup.selected_ids(), [])
+        self.assertTrue(popup.isVisible())
+
+        # Cleared selection also resets the cursor: Down starts at the top.
+        popup.show()
+        popup._on_row_clicked(3, Qt.NoModifier)
+        popup.clear_selection()
+        popup.step_selection(1)
+        self.assertEqual(popup.selected_ids(), [popup._visual_order()[0]])
+        popup.hide()
+
     def test_action_button_modes(self):
         popup, _ = self.make_popup()
         rows = popup._rows

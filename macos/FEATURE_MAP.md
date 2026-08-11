@@ -219,7 +219,8 @@ a POSIX file lock.
   `canBecomeKey`) with an `NSVisualEffectView` (`.menu`) masked by a resizable
   rounded-rect image plus a light-mode `NSBox` tint, animated open/close, placed
   under the status item and clamped on-screen. A global mouse monitor dismisses
-  it on outside clicks; Escape clears an active search first and closes second.
+  it on outside clicks; Escape clears the selection first, an active search
+  second, and closes the panel third.
   It follows SwiftUI's `preferredContentSize` so adding a row doesn't make it
   drift. `AppDelegate.swift`
 - **Panel layout** — header (title + connection dot), toolbar (search, add

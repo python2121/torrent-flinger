@@ -282,14 +282,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // .moveToActiveSpace (not .canJoinAllSpaces) so the panel follows the
         // user to whichever Space they're currently viewing.
         panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary, .stationary]
-        // Escape clears an active search first and closes the panel second —
-        // the same two-stage dismissal as the Linux popup.
+        // Escape peels back one layer per press — selection, then the search
+        // filter, then the panel — exactly as the Linux popup does.
         panel.onCancel = { [weak self] in
             guard let self else { return }
-            if !self.store.searchText.isEmpty {
-                self.store.searchText = ""
-            } else {
-                self.closePanel()
+            // The *visible* selection decides, so a press always changes
+            // something on screen: rows the filter has hidden are cleared with
+            // the search they're hiding behind, one press later.
+            switch Selection.escape(hasSelection: !self.store.selectedInVisualOrder.isEmpty,
+                                    hasSearch: !self.store.searchText.isEmpty) {
+            case .clearSelection: self.store.clearSelection()
+            case .clearSearch: self.store.searchText = ""
+            case .close: self.closePanel()
             }
         }
         // Up/Down move through the list exactly as clicking a row does;
