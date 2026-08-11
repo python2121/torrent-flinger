@@ -6,11 +6,11 @@ and administers a **remote Transmission server**, and gives magnet links and
 the PySide6 tray app in `../flinger/`: the same RPC feature set and the same
 `config.json`, rehoused in a SwiftUI panel hanging off an `NSStatusItem`. It
 polls the server every 3 s while its panel is open and every 30 s while it's
-closed, renders the aggregate speeds in the menu bar, groups torrents by
-status in an expandable list, and opens per-torrent Details, server Options,
-session Statistics and add-torrent windows alongside. It stays out of the Dock
-(`LSUIElement` + `.accessory`) and guards against duplicate menu-bar items with
-a POSIX file lock.
+closed, renders a smoothed view of the aggregate speeds in the menu bar, groups
+torrents by status in an expandable list, and opens per-torrent Details, server
+Options, session Statistics and add-torrent windows alongside. It stays out of
+the Dock (`LSUIElement` + `.accessory`) and guards against duplicate menu-bar
+items with a POSIX file lock.
 
 ## Feature areas
 
@@ -162,6 +162,26 @@ a POSIX file lock.
   the panel is open and every 30 s while it's closed, guarded against
   reentrancy. Free space is decoration and never fails the poll.
   `TorrentStore.swift`
+- **Speeds-only tick** — a second `Timer` calling `session-stats` alone every
+  2.5 s, running only while the panel is closed, the speeds are switched on and
+  something is actually transferring. The menu-bar average needs readings far
+  more often than the idle 30 s poll delivers, but not the torrent list to go
+  with them. Skipped while a full poll — or a previous tick — is still in
+  flight, so a server slower to answer than the tick can't have requests pile
+  up on it. `TorrentStore.swift`
+- **Menu-bar speed smoothing** — `SpeedAverager` widens the readout as a
+  transfer settles: live for the first 15 s, then a 15 s average refreshed
+  every 5 s, then a 30 s average refreshed every 10 s past the 30 s mark. Age
+  runs from when the transfer started, so each new download gets the responsive
+  tier again. Averages come from the session byte counter (bytes over wall
+  time — exact, and undistorted by a late or missing sample), falling back to a
+  time-weighted mean of the rate readings when the counter doesn't move (a
+  server that doesn't report `current-stats`) or goes backwards (a daemon
+  restart). A stall of a few seconds is absorbed; zero for 5 s ends the
+  transfer and clears the bar. A gap wider than the widest window — a sleeping
+  machine, a throttled timer — or a clock stepping backwards breaks continuity
+  and starts the tiers over, rather than averaging the hole into the transfer.
+  `Core/SpeedAverager.swift`
 - **Path-mapping resolution at poll time** — the remote prefix is the explicit
   setting when set, else the common root of the server's download dir and every
   custom dir (so `/data/complete` and `/data/tv` both map through `/data`).
@@ -206,8 +226,17 @@ a POSIX file lock.
 ### UI
 
 - **Menu-bar item** — an SF Symbol reflecting state (idle / transferring /
-  disconnected) plus optional live speeds (`↓1.2M ↑45K`, monospaced digits,
-  toggleable in Options) and a tooltip with the torrent count and full speeds.
+  disconnected) plus optional smoothed speeds (`↓1.2M ↑2.4M`, monospaced digits,
+  toggleable in Options; see *Menu-bar speed smoothing*) and a tooltip with the
+  torrent count, the live speeds and which window the bar is averaging over.
+  Download shows at any speed; upload only above 1 MB/s, since a permanent
+  seeding trickle is width without news. Both still appear in the tooltip and
+  the popover footer at any speed. A lone figure is drawn at the menu bar's own
+  point size so it sits with the system's items; a pair drops two points, which
+  is the only way both fit.
+  The glyph reads the same smoothed numbers, so the two can't disagree — except
+  with the speeds switched off, where there are no numbers to disagree with and
+  no fast sampling to feed a window, so it reads the raw speed instead.
   Repainted from `store.objectWillChange`, hopped one runloop tick because it
   fires before the `@Published` write lands. `AppDelegate.swift`
 - **Status-item right-click menu** — a native `NSMenu` mirroring the Linux tray

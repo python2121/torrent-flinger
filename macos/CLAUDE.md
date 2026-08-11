@@ -111,10 +111,11 @@ what `build-app.sh` runs — compiles none of it into the shipping binary. If yo
 add a file under `SelfTest/`, wrap it the same way, or the release build will
 carry test code.
 
-Current coverage: 72 cases / 347 checks over formatting, path mapping, TV
+Current coverage: 90 cases / 420 checks over formatting, path mapping, TV
 detection, config load/save, torrent state classification, list grouping +
 search, selection arithmetic, custom-directory rules, the Files tab's directory
-tree (`FileNode.tree`), and the RPC client
+tree (`FileNode.tree`), the menu bar's speed smoothing (`SpeedAverager` — pure
+with an injected clock, so a minute of a download runs instantly), and the RPC client
 against `MockRPC` (a `URLProtocol` reproducing the 409 handshake,
 `fileStats[].wanted` as 0/1, and kebab-case `peer-limit`) plus
 `FailingTransport` for the URLSession-error mapping. It deliberately does

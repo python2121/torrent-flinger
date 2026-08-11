@@ -495,6 +495,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// optical breathing room the system's own icons have.
     private static let trayIconSize: CGFloat = 16
 
+    /// Upload only earns space in the menu bar above this. Seeding trickles
+    /// along at a few kB/s more or less permanently, and a number that's always
+    /// there but never interesting is just width taken from the one being
+    /// watched. SI, like every other speed in both builds, so this is 1 MB/s.
+    /// The tooltip and the popover footer still show upload at any speed.
+    private static let uploadDisplayThreshold = 1_000_000
+
     private static var trayImageCache: [TrayIcon: NSImage] = [:]
 
     /// The state glyph, loaded from the SVG shared with the Linux build.
@@ -530,21 +537,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func updateStatusItem() {
         guard let button = statusItem.button else { return }
 
+        // Smoothed, not raw — a menu-bar number is read at a glance and out of
+        // the corner of an eye, which is the worst possible audience for a
+        // reading that halves and doubles every couple of seconds. The glyph
+        // takes the same value so it can't disagree with the numbers beside it.
+        //
+        // With the numbers switched off there's nothing to agree with, and no
+        // fast sampling behind it either (the speeds-only tick is off too), so
+        // the glyph goes back to the raw reading rather than waiting out a
+        // smoothing window it can't feed. Otherwise the arrow would outlive a
+        // finished download by up to two polls instead of one.
+        let showSpeeds = store.config.menubarShowSpeeds
+        let speeds = showSpeeds
+            ? store.menubarSpeeds
+            : SpeedAverager.Speeds(download: store.stats.downloadSpeed,
+                                   upload: store.stats.uploadSpeed)
         let icon = TrayIcon.current(connected: store.connected,
-                                    downloadSpeed: store.stats.downloadSpeed,
+                                    downloadSpeed: speeds.download,
                                     recentlyAdded: store.recentlyAdded)
 
-        var title = ""
-        if store.config.menubarShowSpeeds, store.connected {
-            var parts: [String] = []
-            if store.stats.downloadSpeed > 0 {
-                parts.append("↓\(Format.speedShort(store.stats.downloadSpeed))")
+        var parts: [String] = []
+        if showSpeeds, store.connected {
+            if speeds.download > 0 {
+                parts.append("↓\(Format.speedShort(speeds.download))")
             }
-            if store.stats.uploadSpeed > 0 {
-                parts.append("↑\(Format.speedShort(store.stats.uploadSpeed))")
+            if speeds.upload > Self.uploadDisplayThreshold {
+                parts.append("↑\(Format.speedShort(speeds.upload))")
             }
-            title = parts.joined(separator: " ")
         }
+        let title = parts.joined(separator: " ")
 
         // The speeds are computed first because they decide whether the glyph
         // is drawn at all: while downloading, the arrow only repeats what the
@@ -557,8 +578,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             button.imagePosition = .noImage
         }
 
+        // One figure gets the menu bar's own size, so it reads as one of the
+        // system's items rather than a footnote beside them. Two only fit by
+        // giving those two points back — `↓1.2M ↑2.4M` at full size crowds the
+        // bar, and a notched display has genuinely little room to spare.
+        //
+        // Regular weight for the same reason — `menuBarFont` is regular, and
+        // anything heavier reads as emphasis the numbers haven't earned. Only
+        // the monospaced digits are ours, so the figures don't jitter sideways
+        // as they change.
+        let barPointSize = NSFont.menuBarFont(ofSize: 0).pointSize
         let font = NSFont.monospacedDigitSystemFont(
-            ofSize: NSFont.menuBarFont(ofSize: 0).pointSize - 2, weight: .medium)
+            ofSize: parts.count > 1 ? barPointSize - 2 : barPointSize, weight: .regular)
         // No leading space when the numbers stand alone — that padding only
         // exists to separate them from the glyph.
         let spacer = button.imagePosition == .noImage ? "" : " "
@@ -567,10 +598,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             attributes: [.font: font, .foregroundColor: NSColor.labelColor])
 
         if store.connected {
-            button.toolTip = """
-                Torrent Flinger — \(store.torrents.count) torrents
-                DL: \(Format.speed(store.stats.downloadSpeed))  UL: \(Format.speed(store.stats.uploadSpeed))
-                """
+            // The tooltip is the deliberate look, so it gets the live numbers —
+            // plus a note of which window the bar is showing, so the two
+            // disagreeing reads as the design it is rather than a bug.
+            var lines = [
+                "Torrent Flinger — \(store.torrents.count) torrents",
+                "DL: \(Format.speed(store.stats.downloadSpeed))  UL: \(Format.speed(store.stats.uploadSpeed))",
+            ]
+            if let window = store.menubarWindowDescription {
+                lines.append("Menu bar: \(window)")
+            }
+            button.toolTip = lines.joined(separator: "\n")
         } else {
             button.toolTip = "Torrent Flinger — \(store.errorMessage ?? "connection failed")"
         }

@@ -12,8 +12,19 @@ final class TorrentStore: ObservableObject {
     /// `config.pollIntervalMs`, exactly as on Linux.
     static let hiddenPollInterval: TimeInterval = 30
 
+    /// Cadence for the speeds-only tick. Fast enough that a 15 s window has
+    /// half a dozen readings in it, slow enough to be invisible next to the
+    /// traffic a torrent client is already making.
+    static let speedSampleInterval: TimeInterval = 2.5
+
     @Published private(set) var torrents: [Torrent] = []
     @Published private(set) var stats = SessionStats()
+
+    /// The smoothed speeds the menu bar draws. `stats` keeps the raw readings
+    /// for everything that's looking at the numbers deliberately — the popover
+    /// footer, the tooltip, the statistics window. See `SpeedAverager` for why
+    /// the menu bar can't use them directly.
+    @Published private(set) var menubarSpeeds = SpeedAverager.Speeds.zero
     @Published private(set) var freeSpace: Int64 = -1
     @Published private(set) var connected = false
     @Published private(set) var errorMessage: String?
@@ -48,7 +59,10 @@ final class TorrentStore: ObservableObject {
     private(set) var remotePrefix = ""
 
     private var timer: Timer?
+    private var speedTimer: Timer?
+    private var speedAverager = SpeedAverager()
     private var isPolling = false
+    private var isSamplingSpeeds = false
     private var panelVisible = false
     /// nil until the first successful poll, so we don't announce every
     /// already-finished torrent at launch.
@@ -101,6 +115,7 @@ final class TorrentStore: ObservableObject {
         guard panelVisible != visible else { return }
         panelVisible = visible
         startTimer()
+        updateSpeedTimer()
         if visible {
             refreshClipboardOffer()
             poll()
@@ -109,6 +124,74 @@ final class TorrentStore: ObservableObject {
             // should look freshly opened rather than resuming a stale session.
             clearSelection()
         }
+    }
+
+    // MARK: The speeds-only tick
+    //
+    // The menu bar needs readings far more often than the idle 30 s poll
+    // provides: a 15 s average refreshed every 5 s can't be built out of one
+    // number every half minute. It doesn't need the torrent list to do it,
+    // though — so while the panel is closed and something is actually moving,
+    // a second timer calls `session-stats` on its own. One round trip, no
+    // list, no free-space probe.
+    //
+    // While the panel is open the ordinary poll already runs at the config's
+    // cadence and carries the same numbers, so this stays off and the averager
+    // feeds off those instead.
+
+    private func updateSpeedTimer() {
+        // Nothing transferring means no numbers in the menu bar, so there's
+        // nothing to smooth and no reason to be talking to the server; the
+        // 30 s poll picks the next transfer up. Same for speeds switched off.
+        let wanted = !panelVisible && connected && config.menubarShowSpeeds
+            && (stats.downloadSpeed > 0 || stats.uploadSpeed > 0 || speedAverager.isTracking)
+        guard wanted != (speedTimer != nil) else { return }
+
+        guard wanted else {
+            speedTimer?.invalidate()
+            speedTimer = nil
+            return
+        }
+        let interval = Self.speedSampleInterval
+        let timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.sampleSpeeds() }
+        }
+        timer.tolerance = interval * 0.1
+        speedTimer = timer
+    }
+
+    private func sampleSpeeds() {
+        // A full poll is about to deliver the same numbers; don't race it. And
+        // don't race ourselves either: a server slower to answer than the tick
+        // would otherwise have a new request started on top of every unfinished
+        // one, and out-of-order replies would walk the readings backwards.
+        guard !isPolling, !isSamplingSpeeds else { return }
+        isSamplingSpeeds = true
+        let client = self.client
+        Task { [weak self] in
+            // Errors here are the poll's business — a dropped sample just means
+            // the average coasts on the readings either side of it.
+            let stats = try? await client.sessionStats()
+            self?.isSamplingSpeeds = false
+            if let stats { self?.applyStats(stats) }
+        }
+    }
+
+    /// Adopts a `session-stats` reading from either timer: the raw numbers for
+    /// the detailed surfaces, the smoothed ones for the menu bar.
+    private func applyStats(_ stats: SessionStats) {
+        self.stats = stats
+        let previousWindow = speedAverager.windowDescription
+        if speedAverager.record(stats, at: Date()) {
+            menubarSpeeds = speedAverager.displayed
+        }
+        // Only on a change — two or three lines per transfer. Which window the
+        // bar is on is otherwise invisible from the outside, and "the number
+        // looks wrong" is impossible to chase without it.
+        if speedAverager.windowDescription != previousWindow {
+            Log.info("menubar speeds: \(speedAverager.windowDescription ?? "live")")
+        }
+        updateSpeedTimer()
     }
 
     func poll() {
@@ -143,11 +226,12 @@ final class TorrentStore: ObservableObject {
                            freeSpace: Int64, customDirs: [String], configuredPrefix: String) {
         isPolling = false
         self.torrents = torrents
-        self.stats = stats
         self.freeSpace = freeSpace
         self.serverDownloadDir = session.downloadDir ?? ""
         let wasConnected = self.connected
         self.connected = true
+        // After `connected`, which decides whether the speed tick may run.
+        applyStats(stats)
         self.errorMessage = nil
         self.lastUpdated = Date()
         self.localNetworkRetries = 0
@@ -196,6 +280,13 @@ final class TorrentStore: ObservableObject {
             return
         }
 
+        // A real disconnect ends the transfer as far as the menu bar is
+        // concerned: drop the window rather than let a stale average sit there,
+        // and let the reconnect start again from live.
+        speedAverager.reset()
+        menubarSpeeds = .zero
+        updateSpeedTimer()
+
         let reason = (error as? TransmissionError)?.errorDescription ?? error.localizedDescription
         let message = "Can't reach \(config.host) — \(reason)"
         // The popover has room for one line; the log gets the whole story,
@@ -234,6 +325,11 @@ final class TorrentStore: ObservableObject {
     var selectedInVisualOrder: [Int] { visualOrder.filter { selectedIDs.contains($0) } }
 
     func torrent(id: Int) -> Torrent? { torrents.first { $0.id == id } }
+
+    /// How the menu bar's numbers are being derived right now, or nil while
+    /// they're live readings. The tooltip says it out loud, because the bar and
+    /// the footer will otherwise disagree with no explanation.
+    var menubarWindowDescription: String? { speedAverager.windowDescription }
 
     /// Aggregate footer line: speeds, count, and the server's free space.
     var footerSummary: String {
@@ -378,7 +474,11 @@ final class TorrentStore: ObservableObject {
         client = TransmissionClient(config: config)
         finishedIDs = nil          // don't announce the existing backlog
         connected = false
+        // A new server means new numbers; the old window describes nothing.
+        speedAverager.reset()
+        menubarSpeeds = .zero
         startTimer()
+        updateSpeedTimer()
         poll()
     }
 
