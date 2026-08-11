@@ -55,7 +55,20 @@ final class DetailsViewModel: ObservableObject {
     @Published var locationDraft = ""
     @Published var moveData = true
 
-    @Published var selectedFiles: Set<Int> = []
+    enum Tab: String, CaseIterable {
+        case info, files, peers, trackers, options
+    }
+
+    @Published var selectedTab: Tab = .info
+
+    /// Selected rows, by `FileNode.id` — a row can be a directory, so this
+    /// isn't a set of file indices; `FileNode.indices(for:in:)` resolves it.
+    @Published var selectedFiles: Set<String> = []
+
+    /// The file list as a tree, rebuilt on each poll. Held rather than computed
+    /// per render because a large torrent is a few hundred nodes and the view
+    /// reads it on every pass.
+    @Published private(set) var fileTree: [FileNode] = []
 
     let torrentID: Int
     private let store: TorrentStore
@@ -104,6 +117,9 @@ final class DetailsViewModel: ObservableObject {
         inflight = false
         self.torrent = torrent
         errorText = torrent.errorString
+        if let files = torrent.files {
+            fileTree = FileNode.tree(files: files, stats: torrent.fileStats ?? [])
+        }
         guard !editingOptions else { return }
         downloadLimited = torrent.downloadLimited ?? false
         downloadLimit = torrent.downloadLimit ?? 100
@@ -123,31 +139,14 @@ final class DetailsViewModel: ObservableObject {
 
     // MARK: File rows
 
-    struct FileRow: Identifiable, Equatable {
-        let id: Int
-        let name: String
-        let length: Int64
-        let completed: Int64
-        let wanted: Bool
-        let priority: Int
-
-        var donePercent: String {
-            String(format: "%.0f%%", Double(completed) / Double(max(length, 1)) * 100)
-        }
-    }
-
     static let priorityNames: [Int: String] = [-1: "Low", 0: "Normal", 1: "High"]
     static let priorityArgs: [Int: String] = [-1: "priority-low", 0: "priority-normal", 1: "priority-high"]
 
-    var fileRows: [FileRow] {
-        guard let files = torrent?.files else { return [] }
-        let stats = torrent?.fileStats ?? []
-        return files.enumerated().map { index, file in
-            let stat = index < stats.count ? stats[index] : TorrentFileStats()
-            return FileRow(id: index, name: file.name, length: file.length,
-                           completed: stat.bytesCompleted, wanted: stat.wanted,
-                           priority: stat.priority)
-        }
+    /// File indices behind the rows the context menu should act on: the
+    /// right-clicked rows, or the standing selection when the click landed
+    /// outside it.
+    func fileIndices(for clicked: Set<String>) -> [Int] {
+        FileNode.indices(for: clicked.isEmpty ? selectedFiles : clicked, in: fileTree)
     }
 
     // MARK: Actions
@@ -238,12 +237,12 @@ struct DetailsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             actionBar
-            TabView {
-                infoTab.tabItem { Text("Info") }
-                filesTab.tabItem { Text("Files") }
-                peersTab.tabItem { Text("Peers") }
-                trackersTab.tabItem { Text("Trackers") }
-                optionsTab.tabItem { Text("Options") }
+            TabView(selection: $model.selectedTab) {
+                infoTab.tabItem { Text("Info") }.tag(DetailsViewModel.Tab.info)
+                filesTab.tabItem { Text("Files") }.tag(DetailsViewModel.Tab.files)
+                peersTab.tabItem { Text("Peers") }.tag(DetailsViewModel.Tab.peers)
+                trackersTab.tabItem { Text("Trackers") }.tag(DetailsViewModel.Tab.trackers)
+                optionsTab.tabItem { Text("Options") }.tag(DetailsViewModel.Tab.options)
             }
             if !model.errorText.isEmpty {
                 Text(model.errorText)
@@ -356,27 +355,36 @@ struct DetailsView: View {
 
     private var filesTab: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Table(model.fileRows, selection: $model.selectedFiles) {
-                TableColumn("") { row in
-                    Toggle("", isOn: Binding(
-                        get: { row.wanted },
-                        set: { model.setWanted([row.id], wanted: $0) }))
-                    .toggleStyle(.checkbox)
-                    .labelsHidden()
+            // The outline form of `Table`: folders get a disclosure triangle
+            // and their rows aggregate everything underneath, so a 678-file
+            // torrent opens as one line you can expand.
+            Table(model.fileTree, children: \.children, selection: $model.selectedFiles) {
+                TableColumn("") { node in
+                    FileCheckbox(state: node.wanted) {
+                        model.setWanted(node.indices, wanted: node.wanted.toggled)
+                    }
                 }
                 .width(20)
-                TableColumn("File", value: \.name)
+                TableColumn("File") { node in
+                    HStack(spacing: 5) {
+                        Image(systemName: node.isDirectory ? "folder" : "doc")
+                            .foregroundStyle(.secondary)
+                        Text(node.name).lineLimit(1).truncationMode(.middle)
+                    }
+                    .help(node.name)
+                }
                 TableColumn("Size") { Text(Format.size($0.length)) }
                     .width(80)
                 TableColumn("Done") { Text($0.donePercent) }
                     .width(50)
-                TableColumn("Priority") {
-                    Text(DetailsViewModel.priorityNames[$0.priority] ?? "Normal")
+                TableColumn("Priority") { node in
+                    // A folder whose files disagree has no one priority to show.
+                    Text(node.priority.flatMap { DetailsViewModel.priorityNames[$0] } ?? "Mixed")
                 }
                 .width(70)
             }
-            .contextMenu(forSelectionType: Int.self) { selection in
-                let indices = selection.isEmpty ? Array(model.selectedFiles) : Array(selection)
+            .contextMenu(forSelectionType: FileNode.ID.self) { selection in
+                let indices = model.fileIndices(for: selection)
                 Button("High priority") { model.setPriority(indices, priority: 1) }
                 Button("Normal priority") { model.setPriority(indices, priority: 0) }
                 Button("Low priority") { model.setPriority(indices, priority: -1) }
@@ -384,7 +392,7 @@ struct DetailsView: View {
                 Button("Download") { model.setWanted(indices, wanted: true) }
                 Button("Skip") { model.setWanted(indices, wanted: false) }
             }
-            Text("Checkbox = download this file. Right-click for priority.")
+            Text("Checkbox = download this file; on a folder it applies to everything inside. Right-click for priority.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -473,6 +481,34 @@ struct DetailsView: View {
         case .up: return "↑ Up"
         case .down: return "↓ Down"
         case .bottom: return "⤓ Bottom"
+        }
+    }
+}
+
+/// The Files tab's check control. `Toggle` has no mixed state, and a folder
+/// whose files disagree needs one, so all three states are drawn from SF
+/// Symbols — using a real checkbox for files and a symbol for folders would put
+/// two different controls in the same column.
+struct FileCheckbox: View {
+    let state: FileNode.Wanted
+    let toggle: () -> Void
+
+    var body: some View {
+        Button(action: toggle) {
+            Image(systemName: symbol)
+                .font(.system(size: 13))
+                .foregroundStyle(state == .off ? Color.secondary : Color.accentColor)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(state == .on ? "Skip" : "Download")
+    }
+
+    private var symbol: String {
+        switch state {
+        case .on: return "checkmark.square.fill"
+        case .off: return "square"
+        case .mixed: return "minus.square.fill"
         }
     }
 }

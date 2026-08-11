@@ -15,7 +15,7 @@ import Foundation
 enum SelfTest {
     static let entries: [TestEntry] =
         FormatTests.all + ConfigTests.all + TorrentModelTests.all
-        + UILogicTests.all + ClientTests.all
+        + UILogicTests.all + FileTreeTests.all + ClientTests.all
 
     /// Returns true if the arguments requested a test run (in which case it has
     /// already run them and exited).

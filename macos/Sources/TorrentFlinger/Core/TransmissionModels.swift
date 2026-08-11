@@ -218,6 +218,14 @@ struct TorrentFile: Codable, Equatable {
     var length: Int64 = 0
     var bytesCompleted: Int64 = 0
 
+    /// Declaring `init(from:)` suppresses the synthesized memberwise init, and
+    /// building one by hand is how the tree tests state their fixtures.
+    init(name: String = "", length: Int64 = 0, bytesCompleted: Int64 = 0) {
+        self.name = name
+        self.length = length
+        self.bytesCompleted = bytesCompleted
+    }
+
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         name = (try? c.decodeIfPresent(String.self, forKey: .name)).flatMap { $0 } ?? ""

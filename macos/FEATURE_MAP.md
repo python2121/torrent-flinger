@@ -281,9 +281,12 @@ a POSIX file lock.
   defaults). `OptionsWindow.swift`
 - **Details window** — a per-torrent action bar (pause/resume, verify,
   reannounce, set location, copy magnet, remove) over five tabs: *Info*
-  (sizes, ratio, dates, pieces, privacy, hash, error), *Files* (per-file
-  download checkbox and high/normal/low priority via a multi-select context
-  menu), *Peers*, *Trackers* (with failed-announce highlighting) and *Options*
+  (sizes, ratio, dates, pieces, privacy, hash, error), *Files* (a collapsible
+  directory tree — folders show the size, progress and priority of everything
+  under them and a tri-state checkbox that checks or skips the whole subtree in
+  one call — plus high/normal/low priority via a multi-select context menu;
+  `FileNode` in `Core/FileTree.swift` builds the tree), *Peers*, *Trackers*
+  (with failed-announce highlighting) and *Options*
   (per-torrent limits, seed-ratio mode, peer limit, queue moves). Refreshes
   every 3 s, pauses field updates while the Options tab is being edited, and
   closes itself when the torrent disappears server-side. One window per torrent,

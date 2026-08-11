@@ -52,12 +52,22 @@ enum DebugWindow {
                 Task { await model.load() }
                 content = AnyView(StatsView(model: model))
                 size = NSSize(width: 360, height: 260)
-            case "details":
-                guard let first = store.torrents.first else {
+            case _ where which.hasPrefix("details"):
+                // "details:26" opens that torrent; bare "details" takes the
+                // first one the server lists, which for the Files tab is
+                // rarely the one with an interesting directory tree.
+                let parts = which.split(separator: ":").dropFirst().map(String.init)
+                let wanted = parts.compactMap { Int($0) }.first
+                guard let torrent = wanted.flatMap({ id in store.torrents.first { $0.id == id } })
+                        ?? store.torrents.first else {
                     print("no torrents on the server to show details for")
                     exit(1)
                 }
-                let model = DetailsViewModel(store: store, torrentID: first.id)
+                let model = DetailsViewModel(store: store, torrentID: torrent.id)
+                // "details:26:files" opens straight to that tab.
+                if let tab = parts.compactMap({ DetailsViewModel.Tab(rawValue: $0) }).first {
+                    model.selectedTab = tab
+                }
                 model.start()
                 content = AnyView(DetailsView(model: model))
                 size = NSSize(width: 760, height: 600)
