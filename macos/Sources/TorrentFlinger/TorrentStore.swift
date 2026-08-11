@@ -84,9 +84,13 @@ final class TorrentStore: ObservableObject {
 
     var pathExists: (String) -> Bool = { FileManager.default.fileExists(atPath: $0) }
 
-    init(config: Config = Config.load()) {
+    /// `client` is the injection seam the debug windows use to run against
+    /// canned data (`DemoRPC`) instead of a live server — the same reason
+    /// `directoryExists` and `pathExists` are injectable. In the app it's
+    /// always nil and the client comes from config.
+    init(config: Config = Config.load(), client: TransmissionClient? = nil) {
         self.config = config
-        self.client = TransmissionClient(config: config)
+        self.client = client ?? TransmissionClient(config: config)
         Log.info("starting — server \(config.rpcURL), config \(Config.fileURL.path)")
         startTimer()
         poll()

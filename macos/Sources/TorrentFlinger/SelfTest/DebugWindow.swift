@@ -9,6 +9,7 @@ import SwiftUI
 ///
 ///     swift run TorrentFlinger --show-window options
 ///     swift run TorrentFlinger --show-window popover|add|details|stats
+///     swift run TorrentFlinger --show-window popover --demo   # invented data
 ///
 /// Offscreen snapshotting was tried first and abandoned: SwiftUI draws tab bars
 /// and bottom bars into its own display list rather than into AppKit subviews,
@@ -18,16 +19,26 @@ import SwiftUI
 enum DebugWindow {
     private final class Delegate: NSObject, NSApplicationDelegate {
         let which: String
+        let demo: Bool
         var window: NSWindow?
 
-        init(which: String) { self.which = which }
+        init(which: String, demo: Bool) {
+            self.which = which
+            self.demo = demo
+        }
 
         func applicationDidFinishLaunching(_ notification: Notification) {
             MainActor.assumeIsolated {
-                let store = TorrentStore(config: Config.load())
-                // Let the first poll land so the views show real data.
+                // --demo swaps the live server for invented data, which is what
+                // the documentation screenshots are taken against: the real
+                // config.json would put the reader's hostname, torrent names and
+                // paths into a public repository.
+                let store = demo
+                    ? TorrentStore(config: DemoRPC.config(), client: DemoRPC.client())
+                    : TorrentStore(config: Config.load())
+                // Let the first poll land so the views have data to show.
                 Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    try? await Task.sleep(nanoseconds: demo ? 400_000_000 : 2_000_000_000)
                     self.present(store: store)
                 }
             }
@@ -42,8 +53,12 @@ enum DebugWindow {
                 content = AnyView(PopoverView(store: store))
                 size = NSSize(width: 380, height: 560)
             case "add":
+                // An invented series name that still trips the TV pattern, so
+                // the dialog demonstrates the auto-suggested folder without
+                // putting someone's actual downloads in a screenshot.
                 let model = AddTorrentViewModel(
-                    store: store, link: "magnet:?xt=urn:btih:x&dn=The.Bear.S03E05.1080p.WEB")
+                    store: store,
+                    link: "magnet:?xt=urn:btih:x&dn=Creative.Commons.Chronicles.S02E04.1080p.WEB")
                 Task { await model.load() }
                 content = AnyView(AddTorrentView(model: model))
                 size = NSSize(width: 460, height: 220)
@@ -106,7 +121,7 @@ enum DebugWindow {
         let which = arguments.dropFirst(flagIndex + 1).first { !$0.hasPrefix("--") } ?? "options"
 
         let app = NSApplication.shared
-        let delegate = Delegate(which: which)
+        let delegate = Delegate(which: which, demo: arguments.contains("--demo"))
         Self.delegate = delegate
         app.delegate = delegate
         app.setActivationPolicy(.regular)
