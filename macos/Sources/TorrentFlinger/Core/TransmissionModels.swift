@@ -150,7 +150,7 @@ struct Torrent: Codable, Identifiable, Equatable {
 
     // MARK: Derived
 
-    /// Visual/grouping state, mirroring `flinger/ui/style.py: torrent_state`.
+    /// Visual/grouping state, mirroring `linux/flinger/ui/style.py: torrent_state`.
     enum State: String, CaseIterable {
         case error, magnetizing, complete, paused, verifying, queued, downloading, seeding
     }

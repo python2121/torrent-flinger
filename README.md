@@ -113,7 +113,7 @@ Flatpak is the deployment target:
 ```bash
 git clone https://github.com/python2121/torrent-flinger.git
 cd torrent-flinger
-./scripts/build-flatpak.sh          # user-level, no root
+./linux/scripts/build-flatpak.sh          # user-level, no root
 flatpak run io.github.python2121.TorrentFlinger
 ```
 
@@ -125,9 +125,9 @@ a distrobox fails (nested sandboxing), run the same script on the host.
 Or run it from a venv without installing anything system-wide:
 
 ```bash
-./scripts/setup.sh                  # .venv + PySide6
-./bin/torrent-flinger
-./scripts/install-linux.sh          # register the link handlers
+./linux/scripts/setup.sh                  # .venv + PySide6
+./linux/bin/torrent-flinger
+./linux/scripts/install-linux.sh          # register the link handlers
 ```
 
 Then: right-click the tray icon → **Options…** → set your server → **Test
@@ -158,7 +158,7 @@ that's what a NAS actually serves.
 
 ## Contributing / hacking
 
-The two apps are independent — nothing in `macos/` can break `flinger/` or the
+The two apps are independent — nothing in `macos/` can break `linux/flinger/` or the
 other way round — and both are documented for people arriving cold:
 
 - [`docs/`](docs/) — architecture, the RPC layer and its quirks, config keys,
@@ -169,8 +169,8 @@ other way round — and both are documented for people arriving cold:
   it lives
 
 ```bash
-PYTHONPATH=. .venv/bin/python -m unittest discover tests   # Linux suite
-cd macos && ./test.sh                                       # macOS suite
+cd linux && PYTHONPATH=. .venv/bin/python -m unittest discover tests   # Linux suite
+cd macos && ./test.sh                                                  # macOS suite
 ```
 
 The screenshots above are generated against an invented server

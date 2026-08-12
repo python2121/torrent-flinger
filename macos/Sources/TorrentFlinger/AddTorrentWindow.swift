@@ -3,7 +3,7 @@ import AppKit
 import SwiftUI
 
 /// "Save in folder" dialog shown when a magnet or `.torrent` arrives — a port
-/// of `flinger/ui/add_dialog.py`. One window per incoming link, so a batch of
+/// of `linux/flinger/ui/add_dialog.py`. One window per incoming link, so a batch of
 /// dropped files doesn't queue behind a single modal.
 @MainActor
 final class AddTorrentWindowController {

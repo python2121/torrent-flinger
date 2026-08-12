@@ -20,17 +20,17 @@ the other audience.
 ## The short version
 
 Two independent client apps for one remote Transmission server. The Linux one
-is PySide6 in [`flinger/`](../flinger); the macOS one is Swift/SwiftUI in
+is PySide6 in [`linux/flinger/`](../linux/flinger); the macOS one is Swift/SwiftUI in
 [`macos/`](../macos). They share a config file format and a protocol, not code.
 Neither can break the other, because neither imports the other.
 
 ## Working rules
 
 - **Don't make one build depend on the other.** `macos/` may not require
-  changes under `flinger/`, `bin/`, `packaging/`, `scripts/` or `tests/`, and
+  changes under `linux/flinger/`, `bin/`, `packaging/`, `scripts/` or `linux/tests/`, and
   vice versa. See [architecture.md](architecture.md) for why this is a rule and
   not a preference.
-- **Ported logic changes twice.** `flinger/core/` and
+- **Ported logic changes twice.** `linux/flinger/core/` and
   `macos/Sources/TorrentFlinger/Core/` are deliberate duplicates. A rule change
   in formatting, path mapping or TV detection lands in both, with matching
   tests. [testing.md](testing.md) lists the pairs.

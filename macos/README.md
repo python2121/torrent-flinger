@@ -92,7 +92,7 @@ swift run TorrentFlinger --show-window options:limits   # straight to a tab
 ```
 Sources/TorrentFlinger/Core/       Transmission RPC client, config, formatting,
                                    TV detection. AppKit-free, and a direct port
-                                   of the Python app's flinger/core.
+                                   of the Python app's linux/flinger/core.
 Sources/TorrentFlinger/            AppKit + SwiftUI: menu-bar item, panel,
                                    expandable rows, details/options/stats/add
                                    windows, single-instance lock.

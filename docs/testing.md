@@ -3,7 +3,8 @@
 Two suites, one for each build, plus a parity contract between them.
 
 ```bash
-# Linux / Python
+# Linux / Python — from linux/
+cd linux
 PYTHONPATH=. .venv/bin/python -m unittest discover tests
 .venv/bin/ruff check flinger tests
 
@@ -12,7 +13,7 @@ cd macos && ./test.sh
 cd macos && ./test.sh client/      # filter by test-name substring
 ```
 
-## The Python suite (`tests/`)
+## The Python suite (`linux/tests/`)
 
 `unittest`, driven against a mock Transmission server that runs in-process.
 
@@ -58,7 +59,7 @@ are verified by running the app — see `DebugWindow` in [macos.md](macos.md).
 
 ## The parity contract
 
-`tests/test_core.py` is the reference for shared behaviour. When you change a
+`linux/tests/test_core.py` is the reference for shared behaviour. When you change a
 formatting rule, a path-mapping rule, a TV-detection pattern or the tray-icon
 precedence in one build, the other build's test for it should still describe the
 same behaviour. If it doesn't, the two have drifted.

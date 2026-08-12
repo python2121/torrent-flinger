@@ -5,8 +5,8 @@
 set -euo pipefail
 
 if [ "$(uname -s)" != "Darwin" ]; then
-    echo "build-app.sh is macOS-only. The Linux app lives one level up:" >&2
-    echo "  cd .. && ./scripts/setup.sh && ./bin/torrent-flinger" >&2
+    echo "build-app.sh is macOS-only. The Linux app is its sibling:" >&2
+    echo "  cd ../linux && ./scripts/setup.sh && ./bin/torrent-flinger" >&2
     exit 1
 fi
 
@@ -60,10 +60,10 @@ mkdir -p "${APP_DIR}/Contents/Resources"
 cp "${BIN_PATH}" "${APP_DIR}/Contents/MacOS/${APP_NAME}"
 
 # App icon, built from the shared PNG assets the Linux app already ships
-# (../flinger/assets). Optional: a missing/unbuildable icon is not fatal —
+# (../linux/flinger/assets). Optional: a missing/unbuildable icon is not fatal —
 # the app just falls back to the generic bundle icon.
 ICON_PLIST_ENTRY=""
-ASSETS="../flinger/assets"
+ASSETS="../linux/flinger/assets"
 
 # Menu-bar state glyphs. Monochrome SVG, shared verbatim with the Linux tray —
 # AppKit tints them via isTemplate, Qt tints them by hand. Copied rather than

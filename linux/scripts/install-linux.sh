@@ -13,7 +13,7 @@ APPS="$HOME/.local/share/applications"
 DESKTOP="$APPS/torrent-flinger.desktop"
 
 mkdir -p "$APPS"
-sed -e "s|@ROOT@|$HERE|g" "$HERE/linux/torrent-flinger.desktop.in" > "$DESKTOP"
+sed -e "s|@ROOT@|$HERE|g" "$HERE/torrent-flinger.desktop.in" > "$DESKTOP"
 chmod +x "$HERE/bin/torrent-flinger"
 
 xdg-mime default torrent-flinger.desktop x-scheme-handler/magnet

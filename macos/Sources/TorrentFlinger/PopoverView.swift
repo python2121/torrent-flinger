@@ -23,7 +23,7 @@ struct GroupItem: Identifiable, Equatable {
     var id: String { name }
 }
 
-/// The tray popup, ported from `flinger/ui/popup.py` and dressed in the
+/// The tray popup, ported from `linux/flinger/ui/popup.py` and dressed in the
 /// ClaudeUsage panel's visual language: header strip (title row + toolbar with
 /// search and add button), status-grouped torrent list with expandable rows,
 /// footer with aggregate speeds + free space and

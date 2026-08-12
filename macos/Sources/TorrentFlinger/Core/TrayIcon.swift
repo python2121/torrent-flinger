@@ -3,7 +3,7 @@ import Foundation
 /// Which glyph the menu-bar / tray item shows.
 ///
 /// Deliberately only four states, shared with the Linux build (see
-/// `flinger/core/trayicon.py`, which implements the same precedence): the icon
+/// `linux/flinger/core/trayicon.py`, which implements the same precedence): the icon
 /// is a 16pt monochrome silhouette, and anything finer-grained than this is
 /// unreadable at that size. Per-torrent detail belongs in the popover, not the
 /// menu bar.
@@ -29,7 +29,7 @@ enum TrayIcon: String, CaseIterable {
     ///
     /// **macOS only** — the Linux tray has no text label (`QSystemTrayIcon`
     /// offers icon, tooltip and menu, nothing else), so it always draws the
-    /// glyph and `flinger/core/trayicon.py` has no equivalent of this.
+    /// glyph and `linux/flinger/core/trayicon.py` has no equivalent of this.
     ///
     /// While downloading, the arrow says exactly what `↓1.2M` already says, so
     /// it's dropped and the numbers stand alone. Every other state keeps its

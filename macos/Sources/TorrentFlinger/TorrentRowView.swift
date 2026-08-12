@@ -2,7 +2,7 @@
 import AppKit
 import SwiftUI
 
-/// One torrent in the popover list — a port of `flinger/ui/torrent_row.py`'s
+/// One torrent in the popover list — a port of `linux/flinger/ui/torrent_row.py`'s
 /// `ExpandableListItem`: a compact header (state badge, name, `↓/↑ speed · % ·
 /// ETA` subtitle, slim state-colored progress bar, primary action, chevron)
 /// that expands in place into quick actions plus a details grid.

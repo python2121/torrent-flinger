@@ -29,7 +29,7 @@ enum TransmissionError: LocalizedError, Equatable {
     }
 }
 
-/// Transmission RPC client — a port of `flinger/core/transmission.py`.
+/// Transmission RPC client — a port of `linux/flinger/core/transmission.py`.
 ///
 /// Async/await over `URLSession` rather than the Python version's blocking
 /// `urllib` + thread pool. An actor because the CSRF session id is mutable

@@ -5,7 +5,7 @@
 set -euo pipefail
 
 if [ "$(uname -s)" != "Darwin" ]; then
-    echo "install.sh is macOS-only. For Linux see ../scripts/install-linux.sh" >&2
+    echo "install.sh is macOS-only. For Linux see ../linux/scripts/install-linux.sh" >&2
     exit 1
 fi
 

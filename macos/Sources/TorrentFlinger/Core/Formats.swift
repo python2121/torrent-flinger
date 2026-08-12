@@ -1,6 +1,6 @@
 import Foundation
 
-/// Human-readable formatting — a direct port of `flinger/core/formats.py`.
+/// Human-readable formatting — a direct port of `linux/flinger/core/formats.py`.
 ///
 /// Transmission reports sizes in SI units (1000-based), so we do too. Every
 /// function here is pure and AppKit-free; the unit tests assert the same

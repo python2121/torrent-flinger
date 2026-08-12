@@ -3,7 +3,7 @@
 TorrentFlinger is a single-target Swift Package macOS menu-bar app that views
 and administers a **remote Transmission server**, and gives magnet links and
 `.torrent` files somewhere to go without a browser extension. It's a port of
-the PySide6 tray app in `../flinger/`: the same RPC feature set and the same
+the PySide6 tray app in `../linux/flinger/`: the same RPC feature set and the same
 `config.json`, rehoused in a SwiftUI panel hanging off an `NSStatusItem`. It
 polls the server every 3 s while its panel is open and every 30 s while it's
 closed, renders a smoothed view of the aggregate speeds in the menu bar, groups
@@ -46,7 +46,7 @@ items with a POSIX file lock.
   `CodingKey` (kebab-case inside a camelCase object).
   `Core/TransmissionModels.swift`
 - **Torrent state classification** — `Torrent.state` reproduces
-  `flinger/ui/style.py: torrent_state`: an error string wins over everything,
+  `linux/flinger/ui/style.py: torrent_state`: an error string wins over everything,
   then incomplete metadata (magnetizing), then status, with stopped splitting
   into complete vs paused on `percentDone`. `Torrent.group` maps state onto the
   six popover sections and `Torrent.groupOrder` fixes their order (Error
@@ -87,16 +87,16 @@ items with a POSIX file lock.
   then disconnection, then transfer activity, then idle. "Downloading" keys off
   download speed alone — a seeding-only session shows the magnet, because a
   down arrow would be a lie. The Linux build implements the identical rules in
-  `flinger/core/trayicon.py`; both are tested.
+  `linux/flinger/core/trayicon.py`; both are tested.
   `Core/TrayIcon.swift`
-- **One monochrome artwork set for both builds** — `flinger/assets/tray-*.svg`,
+- **One monochrome artwork set for both builds** — `linux/flinger/assets/tray-*.svg`,
   copied into the bundle's Resources by `build-app.sh` and read directly by the
   Linux tray. Monochrome so each OS can tint it: AppKit does it for free via
   `isTemplate` (adapting to light/dark, a tinted menu bar, and the inverted
   highlight while the panel is open); Qt has no equivalent, so the Linux side
   composites the palette colour through the alpha by hand. Drawn to fill ~82%
   of the 16pt box — a first cut at 65% read visibly lighter than the system
-  icons either side of it. `AppDelegate.trayImage`, `flinger/ui/style.py`
+  icons either side of it. `AppDelegate.trayImage`, `linux/flinger/ui/style.py`
 - **Dev-loop fallback** — `swift run` has no bundle to load resources from, so
   a missing asset falls back to an SF Symbol per state rather than showing a
   blank menu bar. Because that fallback is silent, a test asserts every state's

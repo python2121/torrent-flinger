@@ -18,7 +18,7 @@ if ! ./test.sh; then
   exit 1
 fi
 
-cd "$ROOT"
+cd "$ROOT/linux"
 if [[ -x .venv/bin/python ]]; then
   echo "==> pre-push: running the Linux app's Python tests..."
   if ! PYTHONPATH=. .venv/bin/python -m unittest discover tests -q; then

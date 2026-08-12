@@ -1,7 +1,7 @@
 import Foundation
 
 /// Detect whether a torrent name looks like a TV show — a direct port of
-/// `flinger/core/tvdetect.py`.
+/// `linux/flinger/core/tvdetect.py`.
 ///
 /// Marker-based and precision-first:
 /// 1. episode markers (S01E02 / 3x07)   — near-certain, catches any show

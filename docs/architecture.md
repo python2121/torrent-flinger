@@ -27,7 +27,7 @@ browser extension.
                     ┌───────────────┴────────────────┐
                     │                                │
         ┌───────────┴────────────┐      ┌────────────┴───────────┐
-        │  flinger/  (Linux)     │      │  macos/   (macOS)      │
+        │  linux/    (Linux)     │      │  macos/   (macOS)      │
         │  Python 3 + PySide6    │      │  Swift + SwiftUI       │
         │  system tray + popup   │      │  menu bar + panel      │
         └───────────┬────────────┘      └────────────┬───────────┘
@@ -43,7 +43,7 @@ Qt app on macOS is a bad macOS app and a SwiftUI app on Linux doesn't exist.
 
 ## The one decision worth defending: ported, not shared
 
-`flinger/core/` (Python) and `macos/Sources/TorrentFlinger/Core/` (Swift) are
+`linux/flinger/core/` (Python) and `macos/Sources/TorrentFlinger/Core/` (Swift) are
 the same five modules — RPC client, config, formatting, TV detection, tray icon
 selection — implemented twice, deliberately.
 
@@ -56,7 +56,7 @@ neither app has today.
 What's actually shared is small, stable and specified: a wire protocol that
 Transmission versions, a config file format, and about 400 lines of pure
 formatting rules that change roughly never. Duplicating that is cheap. The
-duplication is held honest by tests: `tests/test_core.py` and the Swift
+duplication is held honest by tests: `linux/tests/test_core.py` and the Swift
 `SelfTest/` suite assert the same rules, and a change on one side that isn't
 mirrored shows up as a failing test on the other.
 
@@ -66,8 +66,8 @@ trade was taken so the macOS app could ship as a single self-contained
 `.app` with no runtime beyond the OS.
 
 The one thing genuinely shared as a *file* is the tray artwork:
-`flinger/assets/tray-{idle,downloading,error,added}.svg`, copied into the macOS
-bundle by `build-app.sh` and tinted at runtime by `flinger/ui/style.py`. One
+`linux/flinger/assets/tray-{idle,downloading,error,added}.svg`, copied into the macOS
+bundle by `build-app.sh` and tinted at runtime by `linux/flinger/ui/style.py`. One
 monochrome set, two consumers.
 
 ## How a click becomes an RPC call
@@ -76,9 +76,9 @@ Both apps have the same four layers; only the names differ.
 
 | Layer | Linux | macOS |
 |---|---|---|
-| Transport | `flinger/core/transmission.py` (`urllib`, blocking) | `Core/TransmissionClient.swift` (`URLSession`, `actor`) |
-| Off-thread | `flinger/ui/worker.py` (`QThreadPool`) | `async`/`await` |
-| State hub | `flinger/ui/app.py` (`FlingerApp`) | `TorrentStore.swift` (`@MainActor`, `ObservableObject`) |
+| Transport | `linux/flinger/core/transmission.py` (`urllib`, blocking) | `Core/TransmissionClient.swift` (`URLSession`, `actor`) |
+| Off-thread | `linux/flinger/ui/worker.py` (`QThreadPool`) | `async`/`await` |
+| State hub | `linux/flinger/ui/app.py` (`FlingerApp`) | `TorrentStore.swift` (`@MainActor`, `ObservableObject`) |
 | Views | `popup.py`, `torrent_row.py`, dialogs | `PopoverView`, `TorrentRowView`, windows |
 
 The hub owns the poll timer, the config, the client, and every mutating action.

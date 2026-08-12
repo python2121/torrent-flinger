@@ -58,7 +58,7 @@ Sources/TorrentFlinger/
 | `Formats.swift`, `TVDetect.swift` | Rule-for-rule ports of the Python modules. |
 | `FileTree.swift` | `FileNode.tree` folds Transmission's flat path list into a directory tree, aggregating size, progress and priority. Pure, so it's tested without a server. |
 | `Selection.swift` | List selection arithmetic and the Escape ordering. Pure for the same reason. |
-| `TrayIcon.swift` | The four-state glyph rule, duplicated from `flinger/core/trayicon.py`, plus `showsGlyph(speedsVisible:)` — macOS-only, because the Linux tray has no text label. |
+| `TrayIcon.swift` | The four-state glyph rule, duplicated from `linux/flinger/core/trayicon.py`, plus `showsGlyph(speedsVisible:)` — macOS-only, because the Linux tray has no text label. |
 | `SpeedAverager.swift` | The menu bar's moving average. See below. |
 | `JSONValue.swift` | Dynamic JSON for free-form request bodies (`torrent-set`, `session-set`). Responses decode into concrete types; only requests need this. |
 

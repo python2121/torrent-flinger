@@ -4,7 +4,7 @@ import Foundation
 import SwiftUI
 
 /// The single source of truth: server state, polling cadence, selection, and
-/// every mutating action. The macOS counterpart of `flinger/ui/app.py`'s
+/// every mutating action. The macOS counterpart of `linux/flinger/ui/app.py`'s
 /// polling half — the window/dialog half lives in `AppDelegate`.
 @MainActor
 final class TorrentStore: ObservableObject {

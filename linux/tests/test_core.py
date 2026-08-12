@@ -1,6 +1,6 @@
 """Core tests against a mock Transmission RPC server (409 handshake included).
 
-Run: .venv/bin/python -m unittest discover tests
+Run (from linux/): .venv/bin/python -m unittest discover tests
 """
 import base64
 import json

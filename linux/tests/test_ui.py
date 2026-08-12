@@ -1,7 +1,7 @@
 """Offscreen UI tests: popup grouping/filtering/expansion, dialogs, and the
 full app loop against the mock RPC server.
 
-Run: PYTHONPATH=. .venv/bin/python -m unittest discover tests
+Run (from linux/): PYTHONPATH=. .venv/bin/python -m unittest discover tests
 """
 import os
 import threading

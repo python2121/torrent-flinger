@@ -2,7 +2,7 @@
 import AppKit
 import SwiftUI
 
-/// Settings window — a port of `flinger/ui/options_dialog.py`, same five tabs
+/// Settings window — a port of `linux/flinger/ui/options_dialog.py`, same five tabs
 /// (Server / General / Download / Local / Limits) so the two builds stay
 /// conceptually identical. Non-modal, like the details windows.
 @MainActor

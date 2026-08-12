@@ -3,7 +3,7 @@ import AppKit
 import SwiftUI
 
 /// Per-torrent administration window: Info / Files / Peers / Trackers /
-/// Options — a port of `flinger/ui/details_dialog.py`, whose feature set
+/// Options — a port of `linux/flinger/ui/details_dialog.py`, whose feature set
 /// follows the consensus of Tremotesf, transmission-remote-gtk and
 /// transmission-qt.
 @MainActor

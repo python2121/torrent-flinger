@@ -1,9 +1,19 @@
-# The Linux build (`flinger/`)
+# The Linux build (`linux/flinger/`)
 
 Python 3 + PySide6. A `QSystemTrayIcon` with a popup styled to pass for a KDE
 Plasma applet. Deployment target is Flatpak; a venv dev mode exists alongside.
 
+Everything below is relative to `linux/`, which is self-contained: the venv,
+the package, its tests and its packaging all live there.
+
+> **Upgrading from before the `linux/` move?** `install-linux.sh` writes
+> absolute paths into `~/.local/share/applications/torrent-flinger.desktop`, so
+> the installed magnet handler still points at the old location. Re-run
+> `./scripts/install-linux.sh` (and `./scripts/build-flatpak.sh` if you use the
+> Flatpak) once, and it's fixed.
+
 ```bash
+cd linux
 ./scripts/setup.sh          # .venv + PySide6, nothing system-wide
 ./bin/torrent-flinger       # run it
 ./scripts/install-linux.sh  # register the magnet/.torrent handler (dev paths)
@@ -26,7 +36,7 @@ the links go over a local socket and this process exits 0 without starting Qt.
 `--smoke-test` runs the whole app for three seconds and quits, which is what the
 integration test drives.
 
-## `flinger/core/` — no Qt, ported to Swift
+## `linux/flinger/core/` — no Qt, ported to Swift
 
 Pure stdlib. Every module here has a Swift counterpart under
 `macos/Sources/TorrentFlinger/Core/` implementing the same rules; see
@@ -40,7 +50,7 @@ Pure stdlib. Every module here has a Swift counterpart under
 | `tvdetect.py` | `looks_like_tv(name)` → `(bool, reason)` on `S01E02`, `1x02`, air dates and season packs; `find_tv_dir(custom_dirs)` returns the first directory flagged `tv`. |
 | `trayicon.py` | `tray_icon(connected, download_speed, recently_added)` → one of four state names, and `ADDED_DURATION_S = 3.0`. The precedence rule is duplicated in Swift with a test on both sides asserting the same 3 s. |
 
-## `flinger/ui/` — PySide6
+## `linux/flinger/ui/` — PySide6
 
 ### `app.py` — `FlingerApp`, the hub
 
@@ -121,7 +131,7 @@ the same asset for free via AppKit template images.
 
 ## Packaging
 
-`packaging/flatpak` holds the manifest (KDE runtime + PySide BaseApp) and the
+`linux/packaging/flatpak` holds the manifest (KDE runtime + PySide BaseApp) and the
 metainfo. The exported `.desktop` registers `x-scheme-handler/magnet` and
 `application/x-bittorrent` so host browsers route links in. Sandbox permissions
 are deliberately minimal: network, tray, notifications.

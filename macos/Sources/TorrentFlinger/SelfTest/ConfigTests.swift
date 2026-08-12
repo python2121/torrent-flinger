@@ -118,7 +118,7 @@ enum ConfigTests {
 }
 
 /// State classification and grouping — the logic the popover's sections and row
-/// badges are built from (`flinger/ui/style.py: torrent_state` plus
+/// badges are built from (`linux/flinger/ui/style.py: torrent_state` plus
 /// `TorrentRow.group`).
 enum TorrentModelTests {
     private static func torrent(_ json: String) throws -> Torrent {

@@ -7,13 +7,14 @@ up, see the [root README](../README.md).
 
 `TorrentFlinger` is a single-target Swift Package macOS menu-bar app
 (`Package.swift`, `Sources/TorrentFlinger/`). It's a port of the PySide6 tray
-app in `../flinger/`: same Transmission RPC feature set, same `config.json`,
+app in `../linux/flinger/`: same Transmission RPC feature set, same `config.json`,
 different shell (SwiftUI + AppKit instead of Qt, menu bar instead of system
 tray).
 
 **The Linux app is off-limits.** Nothing in `macos/` may require a change to
-`../flinger/`, `../bin/`, `../packaging/`, `../scripts/` or `../tests/`. The two
-builds coexist in one repo and must both keep working independently. The one
+anything under `../linux/` — the Python package, its tests, its scripts or its
+packaging. The two builds are peers: they sit side by side at the repo root,
+coexist in one repo, and must both keep working independently. The one
 intentional coupling is `config.json`: both read and write
 `~/Library/Application Support/torrent-flinger/config.json` on macOS with
 identical key names, and both ignore keys they don't know. If you add a config
@@ -56,7 +57,7 @@ drives an `NSStatusItem` (menu bar) and a borderless `NSPanel` hosting
 `objectWillChange` fires *before* the `@Published` write).
 
 `Sources/TorrentFlinger/Core/` is the AppKit-free layer and a direct port of
-`../flinger/core/`:
+`../linux/flinger/core/`:
 
 - **`TransmissionClient.swift`** — an `actor` over `URLSession`. Async/await
   instead of the Python version's blocking `urllib` + `QThreadPool`; an actor
@@ -149,7 +150,7 @@ chrome — the tab bar and the Cancel/Save bar came out blank while the Form
 (a real `NSScrollView`) rendered fine, which reads as a layout bug that isn't
 there. Show the window and capture it externally.
 
-`../tests/test_core.py` is the shared reference for core behavior. When you
+`../linux/tests/test_core.py` is the shared reference for core behavior. When you
 change a formatting rule, a path-mapping rule or a TV-detection pattern here,
 the Python test for it should still describe the same behavior — if it doesn't,
 one of the two builds has drifted.
@@ -217,10 +218,10 @@ break the other target.
   difference between pausing nothing and pausing everything. There are tests
   for it; keep them.
 - **The tray artwork is shared with the Linux build, so changes are paired.**
-  `flinger/assets/tray-{idle,downloading,error,added}.svg` is one monochrome set
-  consumed by both: `build-app.sh` copies it into the bundle, `flinger/ui/style.py`
+  `linux/flinger/assets/tray-{idle,downloading,error,added}.svg` is one monochrome set
+  consumed by both: `build-app.sh` copies it into the bundle, `linux/flinger/ui/style.py`
   tints it for Qt. The selection rules are duplicated deliberately —
-  `Core/TrayIcon.swift` and `flinger/core/trayicon.py` — with matching tests on
+  `Core/TrayIcon.swift` and `linux/flinger/core/trayicon.py` — with matching tests on
   both sides, including one asserting the 3 s "added" duration is the same
   number in both. Keep them in step. Monochrome is a requirement, not a style
   choice: colour can't adapt to a dark panel or a tinted menu bar.

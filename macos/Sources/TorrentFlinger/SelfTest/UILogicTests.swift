@@ -20,13 +20,13 @@ enum UILogicTests {
         return t
     }
 
-    /// `flinger/assets` — the icon set both builds share — found by walking up
-    /// from the working directory, so it resolves whether the suite is run
-    /// from `macos/` (via test.sh) or the repo root.
+    /// `linux/flinger/assets` — the icon set both builds share — found by
+    /// walking up from the working directory, so it resolves whether the suite
+    /// is run from `macos/` (via test.sh) or the repo root.
     private static func sharedAssetsDirectory() -> URL? {
         var dir = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
         for _ in 0..<5 {
-            let candidate = dir.appendingPathComponent("flinger/assets")
+            let candidate = dir.appendingPathComponent("linux/flinger/assets")
             var isDir: ObjCBool = false
             if FileManager.default.fileExists(atPath: candidate.path, isDirectory: &isDir),
                isDir.boolValue {
@@ -233,7 +233,7 @@ enum UILogicTests {
             // source location can't locate the repo — walk up from the working
             // directory instead.
             guard let dir = Self.sharedAssetsDirectory() else {
-                return t.fail("couldn't locate flinger/assets from \(FileManager.default.currentDirectoryPath)")
+                return t.fail("couldn't locate linux/flinger/assets from \(FileManager.default.currentDirectoryPath)")
             }
             for icon in TrayIcon.allCases {
                 let svg = dir.appendingPathComponent("\(icon.assetName).svg")

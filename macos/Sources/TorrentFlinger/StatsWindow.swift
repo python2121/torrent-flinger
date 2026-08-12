@@ -3,7 +3,7 @@ import AppKit
 import SwiftUI
 
 /// Session statistics: this session vs. cumulative totals — a port of
-/// `flinger/ui/stats_dialog.py`.
+/// `linux/flinger/ui/stats_dialog.py`.
 @MainActor
 final class StatsWindowController {
     private let window = HostedWindow()

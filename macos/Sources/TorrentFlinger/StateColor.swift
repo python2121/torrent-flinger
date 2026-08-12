@@ -3,7 +3,7 @@ import AppKit
 import SwiftUI
 
 /// The app's one color/glyph vocabulary for torrent state — the macOS
-/// counterpart of `flinger/ui/style.py`.
+/// counterpart of `linux/flinger/ui/style.py`.
 ///
 /// The two semantic accents keep the Linux build's Breeze palette (so a
 /// screenshot of either app reads the same), while everything neutral comes
