@@ -43,6 +43,18 @@ def _torrent(tid, name, status, done=0.5, **kw):
     return base
 
 
+# A multi-file torrent as the Files tab has to draw it: nested directories, and
+# a subtree the user has partly deselected so the folder rows go mixed.
+NESTED_FILES = {
+    "files": [{"name": "Show/Season 1/ep1.mkv", "length": 1000},
+              {"name": "Show/Season 1/subs/ep1.srt", "length": 10},
+              {"name": "Show/readme.txt", "length": 100}],
+    "fileStats": [{"bytesCompleted": 500, "wanted": 1, "priority": 0},
+                  {"bytesCompleted": 10, "wanted": 0, "priority": 1},
+                  {"bytesCompleted": 0, "wanted": 1, "priority": 0}],
+}
+
+
 class PopupTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -223,6 +235,25 @@ class PopupTest(unittest.TestCase):
         self.assertEqual(out.mount_local, "/mnt/nas")
         self.assertEqual(out.last_download_dir, "/data/tv")  # carried through
 
+    def test_options_roundtrip_refresh(self):
+        from flinger.core.config import Config
+        from flinger.ui.options_dialog import POLL_CHOICES, OptionsDialog
+        dialog = OptionsDialog(Config(poll_interval_ms=5000, slow_poll_when_idle=False))
+        self.assertEqual(dialog.poll.currentData(), 5000)
+        self.assertFalse(dialog.slow_idle.isChecked())
+        dialog.slow_idle.setChecked(True)
+        out = dialog.to_config()
+        self.assertEqual(out.poll_interval_ms, 5000)
+        self.assertTrue(out.slow_poll_when_idle)
+
+        # An interval nothing on the menu offers — a hand-edited config — is
+        # kept rather than rounded to a neighbour the user didn't pick.
+        odd = OptionsDialog(Config(poll_interval_ms=4500))
+        self.assertEqual(odd.poll.currentData(), 4500)
+        self.assertEqual(odd.poll.currentText(), "4.5s")
+        self.assertEqual(odd.poll.count(), len(POLL_CHOICES) + 1)
+        self.assertEqual(odd.to_config().poll_interval_ms, 4500)
+
     def test_escape_clears_search_then_closes(self):
         popup, _ = self.make_popup()
         popup.show()
@@ -373,12 +404,15 @@ class DetailsDialogTest(unittest.TestCase):
     def tearDownClass(cls):
         cls.server.shutdown()
 
-    def test_details_populates_and_edits(self):
+    def _dialog(self):
         from flinger.core.transmission import TransmissionClient
         from flinger.ui.details_dialog import DetailsDialog
         client = TransmissionClient(
             f"http://127.0.0.1:{self.server.server_address[1]}/rpc")
-        dialog = DetailsDialog(client, 1, "test.iso")
+        return DetailsDialog(client, 1, "test.iso")
+
+    def test_details_populates_and_edits(self):
+        dialog = self._dialog()
         self.assertTrue(
             wait_until(lambda: dialog._info["Hash"].text() == "abc123"),
             f"details never populated: hash={dialog._info['Hash'].text()!r} "
@@ -393,6 +427,75 @@ class DetailsDialogTest(unittest.TestCase):
                         for c in MockRPC.calls)),
             [c for c in MockRPC.calls if c[0] == "torrent-set"])
         dialog.timer.stop()
+        dialog.close()
+
+    def test_files_tab_is_a_directory_tree(self):
+        dialog = self._dialog()
+        self.assertTrue(wait_until(lambda: dialog._info["Hash"].text() == "abc123"))
+        # The mock's torrent has one file; drive the tree with a nested one
+        # instead of waiting for a refresh to overwrite it.
+        dialog.timer.stop()
+        dialog._populate_files(NESTED_FILES)
+
+        self.assertEqual(dialog.files.topLevelItemCount(), 1)
+        show = dialog.files.topLevelItem(0)
+        self.assertEqual(show.text(0), "Show")
+        self.assertEqual([show.child(i).text(0) for i in range(show.childCount())],
+                         ["Season 1", "readme.txt"])
+        # Folder rows aggregate their subtree and go partial when it disagrees.
+        self.assertEqual(show.text(1), "1.1 KB")
+        self.assertEqual(show.text(2), "46%")
+        self.assertEqual(show.checkState(0), Qt.PartiallyChecked)
+        self.assertEqual(show.text(3), "Mixed")
+        self.assertEqual(show.child(1).checkState(0), Qt.Checked)
+        self.assertEqual(show.child(1).text(3), "Normal")
+        # Folders start collapsed so a huge torrent opens as one line…
+        self.assertFalse(show.isExpanded())
+        show.setExpanded(True)
+        # …and a refresh must not fold them back up under the user.
+        dialog._populate_files(NESTED_FILES)
+        self.assertTrue(dialog.files.topLevelItem(0).isExpanded())
+
+        # Checking a folder acts on every file underneath it, in one call.
+        dialog.files.topLevelItem(0).setCheckState(0, Qt.Checked)
+        self.assertTrue(wait_until(
+            lambda: any(c[0] == "torrent-set" and c[1].get("files-wanted") == [0, 1, 2]
+                        for c in MockRPC.calls)),
+            [c for c in MockRPC.calls if c[0] == "torrent-set"])
+        dialog.timer.stop()
+        dialog.close()
+
+    def test_detail_columns_are_draggable_and_fill_the_view(self):
+        from PySide6.QtWidgets import QHeaderView
+        dialog = self._dialog()
+        dialog.timer.stop()
+        dialog.resize(700, 560)
+        dialog.show()
+        QTest.qWait(50)
+        headers = [dialog.files.header(), dialog.peers.horizontalHeader(),
+                   dialog.trackers.horizontalHeader()]
+        for tab, header in enumerate(headers, start=1):
+            # A hidden tab page gets its resize event only when it's first
+            # shown, so a header is laid out at the moment you look at it.
+            dialog.tabs.setCurrentIndex(tab)
+            QTest.qWait(30)
+            for column in range(header.count()):
+                # Stretch would fill the view but nail the section in place.
+                self.assertEqual(header.sectionResizeMode(column),
+                                 QHeaderView.Interactive, f"column {column}")
+            self.assertAlmostEqual(
+                sum(header.sectionSize(c) for c in range(header.count())),
+                header.width(), delta=2, msg="no dead space to the right")
+
+        # Dragging any divider hands the layout to the user for good: a later
+        # resize must not shove their column back.
+        dialog.tabs.setCurrentIndex(1)
+        header = dialog.files.header()
+        header.resizeSection(1, 250)
+        widths = [header.sectionSize(c) for c in range(header.count())]
+        dialog.resize(1000, 560)
+        QTest.qWait(50)
+        self.assertEqual([header.sectionSize(c) for c in range(header.count())], widths)
         dialog.close()
 
     def test_add_dialog_flow(self):
@@ -505,6 +608,31 @@ class AppIntegrationTest(unittest.TestCase):
                             for c in MockRPC.calls)))
         finally:
             flinger.timer.stop()
+            flinger.tray.hide()
+
+    def test_poll_interval_follows_the_popup_and_activity(self):
+        from flinger.core.polling import HIDDEN_POLL_MS, IDLE_POLL_MS
+        from flinger.ui.app import FlingerApp
+        flinger = FlingerApp(self.app)
+        try:
+            self.assertTrue(wait_until(lambda: len(flinger.popup._rows) == 1),
+                            "poll never populated the popup")
+            # Closed popup: polling only keeps the tray glyph and tooltip honest.
+            self.assertEqual(flinger.timer.interval(), HIDDEN_POLL_MS)
+            flinger.popup.show()
+            # The mock's torrent is downloading, so the user's rate applies.
+            self.assertTrue(wait_until(lambda: flinger.timer.interval() == 1000),
+                            f"interval stayed at {flinger.timer.interval()}")
+            flinger._active = False
+            flinger._apply_poll_interval()
+            self.assertEqual(flinger.timer.interval(), IDLE_POLL_MS,
+                             "nothing moving, so back off")
+            flinger.config.slow_poll_when_idle = False
+            flinger._apply_poll_interval()
+            self.assertEqual(flinger.timer.interval(), 1000, "unchecked, the setting stands")
+        finally:
+            flinger.timer.stop()
+            flinger.popup.hide()
             flinger.tray.hide()
 
 

@@ -11,6 +11,7 @@ from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 from ..core.config import Config
 from ..core.formats import common_remote_root, fmt_speed, link_display_name
+from ..core.polling import HIDDEN_POLL_MS, any_active, poll_interval_ms
 from ..core.transmission import TransmissionClient, TransmissionError
 from ..core.trayicon import ADDED_DURATION_S, tray_icon
 from .add_dialog import AddDialog
@@ -21,7 +22,6 @@ from .stats_dialog import StatsDialog
 from .worker import run_async
 
 ASSETS = Path(__file__).resolve().parent.parent / "assets"
-HIDDEN_POLL_MS = 30000
 
 
 class FlingerApp(QObject):
@@ -31,6 +31,8 @@ class FlingerApp(QObject):
         self.config = Config.load()
         self.client = TransmissionClient.from_config(self.config)
         self._polling = False
+        self._popup_visible = False
+        self._active = True  # assume the worst until the first poll says otherwise
         self._finished_ids: set[int] | None = None  # None until first successful poll
         self._recently_added = False
         self._tray_state: str | None = None
@@ -105,11 +107,20 @@ class FlingerApp(QObject):
 
     def eventFilter(self, obj, event):
         if obj is self.popup and event.type() in (event.Type.Show, event.Type.Hide):
-            visible = event.type() == event.Type.Show
-            self.timer.start(self.config.poll_interval_ms if visible else HIDDEN_POLL_MS)
-            if visible:
+            self._popup_visible = event.type() == event.Type.Show
+            self._apply_poll_interval()
+            if self._popup_visible:
                 self._poll()
         return super().eventFilter(obj, event)
+
+    def _apply_poll_interval(self):
+        """Retune the timer. Restarted only when the number changes, so a poll
+        landing every three seconds doesn't keep resetting its own countdown.
+        """
+        ms = poll_interval_ms(self.config.poll_interval_ms, self._popup_visible,
+                              self._active, self.config.slow_poll_when_idle)
+        if ms != self.timer.interval():
+            self.timer.start(ms)
 
     def _poll(self):
         if self._polling:
@@ -138,6 +149,8 @@ class FlingerApp(QObject):
         self._polling = False
         torrents = data["torrents"]
         stats = data["stats"]
+        self._active = any_active(torrents)
+        self._apply_poll_interval()
         # remote prefix for path mapping: explicit setting, else the common
         # root of the default download dir and all custom dirs (so torrents
         # in /data/complete and /data/tv both map through /data)
@@ -296,6 +309,7 @@ class FlingerApp(QObject):
         if session_args:
             self._action(lambda: self.client.session_set(session_args))
         self._finished_ids = None
+        self._apply_poll_interval()
         self._poll()
 
     def _show_stats(self):

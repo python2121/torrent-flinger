@@ -49,6 +49,8 @@ Pure stdlib. Every module here has a Swift counterpart under
 | `formats.py` | `fmt_size`, `fmt_speed` (SI, 1000-based), `fmt_eta`, `status_name`, `fmt_date`, `map_remote_path`, `common_remote_root`, `resolve_local_path`, `link_display_name`. |
 | `tvdetect.py` | `looks_like_tv(name)` → `(bool, reason)` on `S01E02`, `1x02`, air dates and season packs; `find_tv_dir(custom_dirs)` returns the first directory flagged `tv`. |
 | `trayicon.py` | `tray_icon(connected, download_speed, recently_added)` → one of four state names, and `ADDED_DURATION_S = 3.0`. The precedence rule is duplicated in Swift with a test on both sides asserting the same 3 s. |
+| `polling.py` | `poll_interval_ms(configured, visible, active, slow_when_idle)` and `any_active(torrents)` — the popup's refresh cadence, including the 10 s idle back-off. The one module here with **no** Swift counterpart: macOS has no idle slow-down, so there's no shared rule to keep in step. |
+| `filetree.py` | `build_tree(files, fileStats)` folds Transmission's flat path list into a directory tree, aggregating size, progress, wanted (tri-state) and priority; `indices_for(ids, tree)` resolves selected rows back to file indices. Pure, so it's tested without a server. Ported from `FileTree.swift` — same ids, same ordering. |
 
 ## `linux/flinger/ui/` — PySide6
 
@@ -115,8 +117,8 @@ the same asset for free via AppKit template images.
 | File | Window |
 |---|---|
 | `add_dialog.py` | Destination picker on a new link: custom dirs with labels, remembered last choice, free space for the selected directory, TV auto-suggestion, "add paused". |
-| `details_dialog.py` | Per-torrent admin: Info / Files / Peers / Trackers / Options tabs, refreshing every `REFRESH_MS` (3 s). File priorities map to `priority-high/normal/low`; actions include verify, reannounce, set location, remove. |
-| `options_dialog.py` | Settings, mirroring the Chrome extension's `options.html`: server, general, download, local paths, and the Limits tab that writes global limits/turtle mode/seed ratio through `session-set`. |
+| `details_dialog.py` | Per-torrent admin: Info / Files / Peers / Trackers / Options tabs, refreshing every `REFRESH_MS` (3 s). Files is a collapsible tree built by `core/filetree.py`, with a tri-state checkbox and aggregates on folder rows. File priorities map to `priority-high/normal/low`; actions include verify, reannounce, set location, remove. Every column on Files/Peers/Trackers is drag-resizable — `_ColumnFitter` grows one column into the slack until the user drags a divider, because Qt's `Stretch` mode fills the view but nails the section in place. |
+| `options_dialog.py` | Settings, mirroring the Chrome extension's `options.html`: server, general (notifications, the `POLL_CHOICES` refresh interval and the idle back-off), download, local paths, and the Limits tab that writes global limits/turtle mode/seed ratio through `session-set`. |
 | `stats_dialog.py` | Session vs cumulative totals. |
 
 ### Plumbing

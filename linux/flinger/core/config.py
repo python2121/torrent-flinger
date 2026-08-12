@@ -42,6 +42,11 @@ class Config:
     notify_on_add: bool = True
     notify_on_finish: bool = True
     poll_interval_ms: int = 3000
+    # Fall back to core.polling.IDLE_POLL_MS while nothing is downloading or
+    # verifying. Unknown to the macOS build, which ignores it and keeps polling
+    # at poll_interval_ms — a slower Linux poll is not a difference the shared
+    # config has to reconcile.
+    slow_poll_when_idle: bool = True
 
     start_paused: bool = False
     show_add_dialog: bool = True

@@ -23,10 +23,13 @@ from PySide6.QtWidgets import (
 )
 
 from ..core.config import Config
+from ..core.polling import IDLE_POLL_MS
 from ..core.transmission import TransmissionClient
 from .worker import run_async
 
-POLL_CHOICES = [(1000, "1s"), (3000, "3s"), (10000, "10s"), (30000, "30s")]
+POLL_CHOICES = [(1000, "1s"), (2000, "2s"), (3000, "3s"), (5000, "5s"),
+                (7000, "7s"), (10000, "10s"), (15000, "15s"), (20000, "20s"),
+                (30000, "30s"), (45000, "45s"), (60000, "1m"), (120000, "2m")]
 
 
 class AddDirDialog(QDialog):
@@ -114,15 +117,28 @@ class OptionsDialog(QDialog):
         self.notify_finish = QCheckBox("Desktop notification when a torrent finishes")
         self.notify_finish.setChecked(config.notify_on_finish)
         self.poll = QComboBox()
-        for ms, label in POLL_CHOICES:
+        choices = list(POLL_CHOICES)
+        # A config edited by hand can hold an interval that isn't on the menu.
+        # Offer it rather than silently rounding the user's setting to a
+        # neighbour they didn't pick.
+        if config.poll_interval_ms not in [ms for ms, _ in choices]:
+            choices.append((config.poll_interval_ms, f"{config.poll_interval_ms / 1000:g}s"))
+            choices.sort()
+        for ms, label in choices:
             self.poll.addItem(label, ms)
-        self.poll.setCurrentIndex(max(0, [ms for ms, _ in POLL_CHOICES].index(config.poll_interval_ms)
-                                      if config.poll_interval_ms in [ms for ms, _ in POLL_CHOICES] else 1))
+        self.poll.setCurrentIndex([ms for ms, _ in choices].index(config.poll_interval_ms))
+        self.slow_idle = QCheckBox(
+            f"Slow to {IDLE_POLL_MS // 1000}s when nothing is downloading")
+        self.slow_idle.setToolTip(
+            "Verifying and queued torrents count as active; seeding doesn't.\n"
+            "Never speeds the interval up — a slower setting is left alone.")
+        self.slow_idle.setChecked(config.slow_poll_when_idle)
         general = QWidget()
         gf = QFormLayout(general)
         gf.addRow(self.notify_add)
         gf.addRow(self.notify_finish)
         gf.addRow("Popup refresh interval", self.poll)
+        gf.addRow("", self.slow_idle)
 
         # download
         self.start_paused = QCheckBox("Add torrents in paused state")
@@ -342,6 +358,7 @@ class OptionsDialog(QDialog):
             notify_on_add=self.notify_add.isChecked(),
             notify_on_finish=self.notify_finish.isChecked(),
             poll_interval_ms=self.poll.currentData(),
+            slow_poll_when_idle=self.slow_idle.isChecked(),
             start_paused=self.start_paused.isChecked(),
             show_add_dialog=self.show_dialog.isChecked(),
             custom_dirs=dirs,

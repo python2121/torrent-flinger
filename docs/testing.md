@@ -73,6 +73,7 @@ Pairs that are asserted on both sides:
 | `map_remote_path` component matching | `test_core.py` | `FormatTests` |
 | TV detection patterns | `test_core.py` | `ConfigTests` / `UILogicTests` |
 | Tray-icon precedence and the 3 s "added" duration | `test_core.py` | `UILogicTests` |
+| The Files tab's directory tree: ids, ordering, aggregates, tri-state | `test_core.py` | `FileTreeTests` |
 | `ids: []` is a no-op, `ids: nil` is everything | `test_core.py` | `ClientTests` |
 | The 409 handshake | `MockRPC` | `MockRPC` |
 

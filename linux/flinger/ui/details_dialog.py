@@ -6,7 +6,7 @@ per-torrent limits, verify/reannounce/set-location/queue actions.
 """
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QEvent, QObject, Qt, QTimer
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QApplication,
@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSpinBox,
+    QStyle,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -35,12 +36,76 @@ from PySide6.QtWidgets import (
 )
 
 from ..core import transmission as tr
+from ..core.filetree import MIXED, OFF, ON, FileNode, build_tree, indices_for
 from ..core.formats import fmt_date, fmt_eta, fmt_size, fmt_speed, status_name
 from .worker import run_async
 
 REFRESH_MS = 3000
 PRIORITY_NAMES = {-1: "Low", 0: "Normal", 1: "High"}
 PRIORITY_ARGS = {-1: "priority-low", 0: "priority-normal", 1: "priority-high"}
+# The Files tab draws server state, so a folder whose subtree disagrees needs a
+# third box. Qt.ItemIsUserTristate is deliberately *not* set on those items:
+# without it a click on a partial box goes straight to checked, which is the
+# rule the macOS build follows (filetree.toggled) — cycling through partial
+# would send an unwanted/wanted pair nobody asked for.
+CHECK_STATES = {ON: Qt.Checked, OFF: Qt.Unchecked, MIXED: Qt.PartiallyChecked}
+
+
+def _flatten(nodes: list[FileNode]):
+    """Every node, parents before children — the order rows are created in."""
+    for node in nodes:
+        yield node
+        yield from _flatten(node.children or [])
+
+
+class _ColumnFitter(QObject):
+    """Draggable columns that still fill the view until the user takes over.
+
+    Neither of Qt's two modes does this on its own: `Stretch` fills the width
+    but nails the section in place, so the column can't be dragged at all,
+    while `Interactive` alone leaves dead space to the right of the last one.
+    So every section is interactive and `fill` absorbs the slack on each
+    resize — until the user drags any header divider, after which the layout is
+    theirs and we stop touching it.
+    """
+
+    MIN_FILL = 120
+
+    def __init__(self, view, header, fill: int, widths: dict[int, int]):
+        super().__init__(view)
+        self.header = header
+        self.fill = fill
+        self.user_sized = False
+        self._applying = False
+        header.setSectionResizeMode(QHeaderView.Interactive)
+        header.setStretchLastSection(False)
+        for column, width in widths.items():
+            header.resizeSection(column, width)
+        header.sectionResized.connect(self._on_section_resized)
+        # Watch the *header*, not the view: inside the view's own resize event
+        # the header hasn't been laid out yet and still reports its old width,
+        # so the slack computed there is nonsense.
+        header.installEventFilter(self)
+
+    def _on_section_resized(self, *_):
+        if not self._applying:
+            self.user_sized = True
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Type.Resize:
+            self._fit()
+        return False
+
+    def _fit(self):
+        if self.user_sized:
+            return
+        others = sum(self.header.sectionSize(i)
+                     for i in range(self.header.count()) if i != self.fill)
+        width = max(self.header.width() - others, self.MIN_FILL)
+        if width != self.header.sectionSize(self.fill):
+            self._applying = True
+            self.header.resizeSection(self.fill, width)
+            self._applying = False
 
 
 class SetLocationDialog(QDialog):
@@ -72,6 +137,7 @@ class DetailsDialog(QDialog):
         self._t: dict = {}
         self._updating = False
         self._inflight = False
+        self._closed = False
 
         # --- action bar ---------------------------------------------------
         self.pause_btn = QPushButton("Pause")
@@ -132,13 +198,22 @@ class DetailsDialog(QDialog):
     def _build_files(self) -> QWidget:
         self.files = QTreeWidget()
         self.files.setHeaderLabels(["File", "Size", "Done", "Priority"])
-        self.files.setRootIsDecorated(False)
         self.files.setSelectionMode(QTreeWidget.ExtendedSelection)
-        self.files.header().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.files.setUniformRowHeights(True)
+        _ColumnFitter(self.files, self.files.header(), fill=0,
+                      widths={1: 90, 2: 60, 3: 90})
         self.files.itemChanged.connect(self._on_file_check)
         self.files.setContextMenuPolicy(Qt.CustomContextMenu)
         self.files.customContextMenuRequested.connect(self._file_menu)
-        hint = QLabel("Checkbox = download this file. Right-click for priority.")
+        # Folders start collapsed, so a 678-file torrent opens as one line.
+        self._file_tree: list[FileNode] = []
+        self._file_nodes: dict[str, FileNode] = {}
+        self._file_items: dict[str, QTreeWidgetItem] = {}
+        self._file_shape: list[str] = []
+        self._dir_icon = self.style().standardIcon(QStyle.StandardPixmap.SP_DirIcon)
+        self._file_icon = self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon)
+        hint = QLabel("Checkbox = download this file; on a folder it applies to "
+                      "everything inside. Right-click for priority.")
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.addWidget(self.files)
@@ -149,7 +224,8 @@ class DetailsDialog(QDialog):
         self.peers = QTableWidget(0, 6)
         self.peers.setHorizontalHeaderLabels(
             ["Address", "Client", "Flags", "Progress", "Down", "Up"])
-        self.peers.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        _ColumnFitter(self.peers, self.peers.horizontalHeader(), fill=1,
+                      widths={0: 130, 2: 60, 3: 70, 4: 90, 5: 90})
         self.peers.verticalHeader().setVisible(False)
         self.peers.setEditTriggers(QTableWidget.NoEditTriggers)
         self.peers.setSortingEnabled(True)
@@ -159,7 +235,8 @@ class DetailsDialog(QDialog):
         self.trackers = QTableWidget(0, 5)
         self.trackers.setHorizontalHeaderLabels(
             ["Tracker", "Seeders", "Leechers", "Last announce", "Next announce"])
-        self.trackers.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        _ColumnFitter(self.trackers, self.trackers.horizontalHeader(), fill=0,
+                      widths={1: 70, 2: 70, 3: 150, 4: 150})
         self.trackers.verticalHeader().setVisible(False)
         self.trackers.setEditTriggers(QTableWidget.NoEditTriggers)
         return self.trackers
@@ -199,8 +276,15 @@ class DetailsDialog(QDialog):
 
     # --- refresh ------------------------------------------------------------
 
+    def closeEvent(self, event):
+        # WA_DeleteOnClose frees the widgets, but an in-flight run_async
+        # callback still holds this object and would reach for them.
+        self._closed = True
+        self.timer.stop()
+        super().closeEvent(event)
+
     def _refresh(self):
-        if self._inflight:
+        if self._closed or self._inflight:
             return
         self._inflight = True
         run_async(lambda: self.client.torrent_details(self.torrent_id),
@@ -208,6 +292,8 @@ class DetailsDialog(QDialog):
 
     def _on_error(self, message: str):
         self._inflight = False
+        if self._closed:
+            return
         if "not found" in message:  # torrent removed on the server
             self.close()
         else:
@@ -215,6 +301,8 @@ class DetailsDialog(QDialog):
 
     def _populate(self, t: dict):
         self._inflight = False
+        if self._closed:
+            return
         self._t = t
         paused = t["status"] == tr.STATUS_STOPPED
         self.pause_btn.setVisible(not paused)
@@ -255,29 +343,54 @@ class DetailsDialog(QDialog):
             self._populate_options(t)
 
     def _populate_files(self, t: dict):
-        files = t.get("files", [])
-        stats = t.get("fileStats", [])
+        # Mid-metadata-fetch a torrent has no file list at all; keep the rows
+        # we have rather than blanking the tab.
+        if "files" not in t:
+            return
+        tree = build_tree(t["files"], t.get("fileStats", []))
+        self._file_tree = tree
+        self._file_nodes = {node.id: node for node in _flatten(tree)}
+        shape = list(self._file_nodes)
         self._updating = True
         try:
-            if self.files.topLevelItemCount() != len(files):
+            # Rebuilding drops expansion and selection, so it happens only when
+            # the file list itself changed — not on every 3 s refresh.
+            if shape != self._file_shape:
+                expanded = {node_id for node_id, item in self._file_items.items()
+                            if item.isExpanded()}
                 self.files.clear()
-                for i, f in enumerate(files):
-                    item = QTreeWidgetItem(["", "", "", ""])
-                    item.setData(0, Qt.UserRole, i)
-                    item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-                    self.files.addTopLevelItem(item)
-            for i, (f, s) in enumerate(zip(files, stats)):
-                item = self.files.topLevelItem(i)
-                item.setText(0, f["name"])
-                item.setToolTip(0, f["name"])
-                item.setText(1, fmt_size(f.get("length", 0)))
-                length = f.get("length", 0) or 1
-                item.setText(2, f"{s.get('bytesCompleted', 0) / length * 100:.0f}%")
-                item.setText(3, PRIORITY_NAMES.get(s.get("priority", 0), "Normal"))
-                # wanted is serialized as 0/1, not boolean — treat as truthy
-                item.setCheckState(0, Qt.Checked if s.get("wanted") else Qt.Unchecked)
+                self._file_items = {}
+                self._add_file_items(self.files.invisibleRootItem(), tree)
+                self._file_shape = shape
+                for node_id in expanded:
+                    item = self._file_items.get(node_id)
+                    if item is not None:
+                        item.setExpanded(True)
+            for node_id, item in self._file_items.items():
+                self._update_file_item(item, self._file_nodes[node_id])
         finally:
             self._updating = False
+
+    def _add_file_items(self, parent: QTreeWidgetItem, nodes: list[FileNode]):
+        for node in nodes:
+            item = QTreeWidgetItem(["", "", "", ""])
+            item.setData(0, Qt.UserRole, node.id)
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setIcon(0, self._dir_icon if node.is_directory else self._file_icon)
+            parent.addChild(item)
+            self._file_items[node.id] = item
+            if node.children:
+                self._add_file_items(item, node.children)
+
+    def _update_file_item(self, item: QTreeWidgetItem, node: FileNode):
+        item.setText(0, node.name)
+        item.setToolTip(0, node.name)
+        item.setText(1, fmt_size(node.length))
+        item.setText(2, node.done_percent)
+        # A folder whose files disagree has no one priority to show.
+        item.setText(3, "Mixed" if node.priority is None
+                     else PRIORITY_NAMES.get(node.priority, "Normal"))
+        item.setCheckState(0, CHECK_STATES[node.wanted])
 
     def _populate_peers(self, peers: list[dict]):
         self.peers.setSortingEnabled(False)
@@ -317,21 +430,32 @@ class DetailsDialog(QDialog):
 
     def _do(self, fn):
         run_async(fn, on_done=lambda _: self._refresh(),
-                  on_error=lambda msg: QMessageBox.warning(self, "Transmission error", msg))
+                  on_error=lambda msg: None if self._closed
+                  else QMessageBox.warning(self, "Transmission error", msg))
 
     def _on_file_check(self, item, column):
         if self._updating or column != 0:
             return
-        index = item.data(0, Qt.UserRole)
+        node = self._file_nodes.get(item.data(0, Qt.UserRole))
+        if node is None:
+            return
+        # Qt has already applied the click, and without ItemIsUserTristate that
+        # lands on checked for anything that wasn't fully checked — a folder's
+        # whole subtree in one call.
         key = "files-wanted" if item.checkState(0) == Qt.Checked else "files-unwanted"
-        self._do(lambda: self.client.torrent_set([self.torrent_id], {key: [index]}))
+        indices = list(node.indices)
+        self._do(lambda: self.client.torrent_set([self.torrent_id], {key: indices}))
 
     def _file_menu(self, pos):
-        items = self.files.selectedItems() or [self.files.itemAt(pos)]
-        items = [i for i in items if i is not None]
-        if not items:
+        # The right-clicked row, or the standing selection when the click
+        # landed inside it.
+        items = self.files.selectedItems()
+        clicked = self.files.itemAt(pos)
+        if clicked is not None and clicked not in items:
+            items = [clicked]
+        indices = indices_for({i.data(0, Qt.UserRole) for i in items}, self._file_tree)
+        if not indices:
             return
-        indices = [i.data(0, Qt.UserRole) for i in items]
         menu = QMenu(self)
         for prio, label in ((1, "High priority"), (0, "Normal priority"), (-1, "Low priority")):
             menu.addAction(QAction(

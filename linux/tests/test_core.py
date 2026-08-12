@@ -424,3 +424,170 @@ class TestTrayIcon(unittest.TestCase):
         self.assertEqual(len(STATES), 4)
         # Must match TrayIcon.addedDuration on the macOS side.
         self.assertEqual(ADDED_DURATION_S, 3.0)
+
+
+class TestFileTree(unittest.TestCase):
+    """The Files tab's tree: folding Transmission's flat path list into
+    directories, the aggregates each folder row shows, and resolving a
+    selection of rows back to the file indices an RPC call takes. Mirrors
+    macos/.../SelfTest/FileTreeTests.swift case for case — when a rule changes
+    here, change it there."""
+
+    @staticmethod
+    def _stat(completed, wanted=1, priority=0):
+        return {"bytesCompleted": completed, "wanted": wanted, "priority": priority}
+
+    # Show/Season 1/ep1.mkv, Show/Season 1/subs/ep1.srt, Show/readme.txt
+    SAMPLE = [{"name": "Show/Season 1/ep1.mkv", "length": 1000},
+              {"name": "Show/Season 1/subs/ep1.srt", "length": 10},
+              {"name": "Show/readme.txt", "length": 100}]
+
+    def test_folds_paths_into_directories(self):
+        from flinger.core.filetree import build_tree
+        tree = build_tree(self.SAMPLE, [self._stat(1000), self._stat(10), self._stat(100)])
+        self.assertEqual(len(tree), 1, "one root: every file shares the torrent's top folder")
+        show = tree[0]
+        self.assertEqual(show.name, "Show")
+        self.assertTrue(show.is_directory)
+        # A directory appears where its first file did, so the tree reads in
+        # the order the server listed the files.
+        self.assertEqual([c.name for c in show.children], ["Season 1", "readme.txt"])
+        season = show.children[0]
+        self.assertEqual([c.name for c in season.children], ["ep1.mkv", "subs"])
+        self.assertEqual([c.name for c in season.children[1].children], ["ep1.srt"])
+        self.assertFalse(show.children[1].is_directory, "a file has no children, so no triangle")
+
+    def test_directories_aggregate_their_subtree(self):
+        from flinger.core.filetree import build_tree
+        show = build_tree(self.SAMPLE, [self._stat(500), self._stat(10), self._stat(0)])[0]
+        self.assertEqual(show.length, 1110)
+        self.assertEqual(show.completed, 510)
+        self.assertEqual(show.done_percent, "46%")
+        self.assertEqual(show.indices, [0, 1, 2], "checking a folder acts on every file under it")
+        self.assertEqual(show.children[0].indices, [0, 1])
+        self.assertEqual(show.children[0].length, 1010)
+
+    def test_wanted_is_tri_state(self):
+        from flinger.core.filetree import MIXED, OFF, ON, build_tree, toggled
+        all_on = build_tree(self.SAMPLE, [self._stat(0)] * 3)
+        self.assertEqual(all_on[0].wanted, ON)
+
+        all_off = build_tree(self.SAMPLE, [self._stat(0, wanted=0)] * 3)
+        self.assertEqual(all_off[0].wanted, OFF)
+
+        some = build_tree(self.SAMPLE, [self._stat(0), self._stat(0, wanted=0),
+                                        self._stat(0, wanted=0)])
+        self.assertEqual(some[0].wanted, MIXED, "the root disagrees with itself")
+        self.assertEqual(some[0].children[0].wanted, MIXED, "…and so does Season 1")
+        self.assertEqual(some[0].children[1].wanted, OFF, "readme.txt alone is unambiguous")
+
+        # A click on anything not fully checked checks it, which is the only
+        # way out of mixed with one gesture.
+        self.assertTrue(toggled(MIXED))
+        self.assertTrue(toggled(OFF))
+        self.assertFalse(toggled(ON))
+
+    def test_priority_is_none_when_the_subtree_disagrees(self):
+        from flinger.core.filetree import build_tree
+        same = build_tree(self.SAMPLE, [self._stat(0, priority=1)] * 3)
+        self.assertEqual(same[0].priority, 1)
+
+        mixed = build_tree(self.SAMPLE, [self._stat(0, priority=1), self._stat(0), self._stat(0)])
+        self.assertIsNone(mixed[0].priority, "the folder row has no single priority to show")
+        self.assertEqual(mixed[0].children[1].priority, 0, "a file always has one")
+
+    def test_selection_resolves_to_file_indices(self):
+        from flinger.core.filetree import build_tree, indices_for
+        tree = build_tree(self.SAMPLE, [self._stat(0)] * 3)
+        show = tree[0]
+        season, readme = show.children
+
+        self.assertEqual(indices_for({readme.id}, tree), [2])
+        self.assertEqual(indices_for({season.id}, tree), [0, 1],
+                         "a folder stands for its whole subtree")
+        # Selecting a folder and a file inside it must not send that file twice
+        # — Transmission would take it, but the count in a confirmation would lie.
+        self.assertEqual(indices_for({season.id, season.children[0].id}, tree), [0, 1])
+        self.assertEqual(indices_for(set(), tree), [])
+        self.assertEqual(indices_for({"nonexistent"}, tree), [])
+
+    def test_single_file_torrents_and_short_filestats(self):
+        from flinger.core.filetree import ON, build_tree
+        # No directory component: one row, no triangle — the common case for a movie.
+        flat = build_tree([{"name": "Movie.2026.mkv", "length": 42}], [self._stat(42)])
+        self.assertEqual(len(flat), 1)
+        self.assertFalse(flat[0].is_directory)
+        self.assertEqual(flat[0].name, "Movie.2026.mkv")
+        self.assertEqual(flat[0].indices, [0])
+
+        # Some servers send fewer fileStats than files mid-metadata-fetch; the
+        # missing ones take the documented defaults rather than dropping the rows.
+        short = build_tree(self.SAMPLE, [self._stat(1000)])
+        self.assertEqual(len(short[0].indices), 3)
+        self.assertEqual(short[0].wanted, ON)
+        self.assertEqual(short[0].completed, 1000)
+
+        self.assertEqual(build_tree([], []), [])
+
+    def test_ids_are_stable_and_unique(self):
+        from flinger.core.filetree import build_tree
+        first = build_tree(self.SAMPLE, [self._stat(0)] * 3)
+        second = build_tree(self.SAMPLE, [self._stat(1)] * 3)
+        # Refreshes rebuild the tree every few seconds; the ids have to survive
+        # that or the tree would collapse under the user.
+        self.assertEqual(first[0].id, second[0].id)
+        self.assertEqual([c.id for c in first[0].children], [c.id for c in second[0].children])
+
+        # A torrent that lists the same path twice still gets two rows.
+        duplicated = build_tree([{"name": "a/x.bin", "length": 1},
+                                 {"name": "a/x.bin", "length": 1}],
+                                [self._stat(0), self._stat(0)])
+        ids = [c.id for c in duplicated[0].children]
+        self.assertEqual(len(ids), 2)
+        self.assertEqual(len(set(ids)), 2, "duplicate paths must not collapse into one row")
+
+
+class TestPolling(unittest.TestCase):
+    """How often the popup refreshes. Linux-only — the macOS build has no idle
+    slow-down — so there's no Swift counterpart to keep in step."""
+
+    def test_a_hidden_popup_is_always_lazy(self):
+        from flinger.core.polling import HIDDEN_POLL_MS, poll_interval_ms
+        for slow in (True, False):
+            for active in (True, False):
+                self.assertEqual(
+                    poll_interval_ms(1000, visible=False, active=active,
+                                     slow_when_idle=slow), HIDDEN_POLL_MS,
+                    "nobody is looking; only the tray glyph depends on this")
+
+    def test_idle_slow_down_is_opt_out_and_only_applies_while_idle(self):
+        from flinger.core.polling import IDLE_POLL_MS, poll_interval_ms
+        self.assertEqual(poll_interval_ms(1000, True, active=False, slow_when_idle=True),
+                         IDLE_POLL_MS)
+        self.assertEqual(poll_interval_ms(1000, True, active=True, slow_when_idle=True),
+                         1000, "something is moving, so the numbers have to keep up")
+        self.assertEqual(poll_interval_ms(1000, True, active=False, slow_when_idle=False),
+                         1000, "unchecked, the user's interval stands")
+
+    def test_idle_never_speeds_the_interval_up(self):
+        from flinger.core.polling import poll_interval_ms
+        # Asking for 30s and being polled every 10s would be a surprise in the
+        # wrong direction, so the slow-down is a floor, not a replacement.
+        self.assertEqual(poll_interval_ms(30000, True, active=False, slow_when_idle=True),
+                         30000)
+
+    def test_active_means_downloading_or_verifying_not_seeding(self):
+        from flinger.core.polling import any_active
+        self.assertFalse(any_active([]))
+        self.assertFalse(any_active([{"status": 0}]), "stopped")
+        self.assertFalse(any_active([{"status": 6}, {"status": 5}]),
+                         "a seed box would otherwise never go idle")
+        self.assertTrue(any_active([{"status": 6}, {"status": 4}]), "downloading")
+        self.assertTrue(any_active([{"status": 3}]), "queued to download")
+        self.assertTrue(any_active([{"status": 2}]), "verifying moves a progress bar")
+        self.assertTrue(any_active([{"status": 1}]), "queued to verify")
+        self.assertFalse(any_active([{}]), "a torrent mid-metadata-fetch has no status")
+
+    def test_the_config_key_defaults_on(self):
+        from flinger.core.config import Config
+        self.assertTrue(Config().slow_poll_when_idle)

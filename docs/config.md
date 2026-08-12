@@ -35,6 +35,7 @@ poll buys little against an attacker who can already read your home directory.
 | `notify_on_add` | bool | `true` | Notify when a torrent is accepted |
 | `notify_on_finish` | bool | `true` | Notify when one completes |
 | `poll_interval_ms` | int | `3000` | Poll cadence **while the panel is open** (30 s is hard-coded while closed) |
+| `slow_poll_when_idle` | bool | `true` | Linux only. Back off to 10 s while nothing is downloading or verifying. Never *speeds up* a slower `poll_interval_ms`. macOS ignores it and keeps its own cadence |
 | `start_paused` | bool | `false` | Add torrents paused |
 | `show_add_dialog` | bool | `true` | Show the destination dialog on a new link; off means "use the defaults silently" |
 | `custom_dirs` | array | `[]` | `[{"label": "TV", "dir": "/srv/tv", "tv": true}]` — destinations offered in the add dialog |
