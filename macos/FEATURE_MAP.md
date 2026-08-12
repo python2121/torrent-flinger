@@ -213,8 +213,9 @@ items with a POSIX file lock.
   preserves server order within a group (queue position is meaningful) and
   omits empty groups so no bare header renders. Pure, so the popover's list
   content is testable without a store. `Core/TransmissionModels.swift`
-- **Actions** — start/stop (single, batch, and all), verify, reannounce,
-  remove (with optional data deletion), add, copy magnets, open web UI. Each
+- **Actions** — start/stop (single, batch, and all), remove (with optional data
+  deletion), add, copy magnets, open web UI; verify and reannounce live on
+  `DetailsViewModel`, since the details window is the only place offering them. Each
   re-polls on success and surfaces failures as a notification rather than
   blocking the panel. `TorrentStore.swift`
 - **Reveal in Finder** — resolves the torrent's server-side directory to a local
@@ -266,8 +267,11 @@ items with a POSIX file lock.
   torrent; the ellipsis entries elsewhere are the ones that confirm) and a chevron
   that expands quick actions plus a six-field detail grid.
   `TorrentRowView.swift`
-- **Row context menu** — resume, pause, verify, reannounce, copy magnet(s),
-  and — for a single row — Details and Reveal in Finder, plus Remove. Acts on
+- **Row context menu** — Resume (only when something in the selection is
+  stopped), Pause (only when something in it is running), and — for a single
+  row — Reveal in Finder, Torrent files (the details window opened on its Files
+  tab) and Details, plus Remove. Verify, reannounce and copy magnet were
+  deliberately dropped from here; they live in the details window. Acts on
   the whole selection when the clicked row is in it. Targets are computed
   purely so building the menu never mutates state mid-update.
   `TorrentRowView.swift`

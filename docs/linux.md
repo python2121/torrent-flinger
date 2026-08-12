@@ -90,7 +90,12 @@ web-UI / settings buttons). `GROUP_ORDER` fixes the section order — Error,
 Downloading, Verifying, Seeding, Paused, Finished — and is the same order as the
 Swift `Torrent.grouped`.
 
-Also owns: live search filtering, keyboard navigation and range selection,
+Also owns: live search filtering, keyboard navigation and range selection, the
+row context menu (`_build_context_menu`: Resume only when something selected is
+stopped and Pause only when something is running, then — on a single row —
+Reveal in Dolphin, Torrent files… and Details…, where the first of those two
+emits `files_requested` so `FlingerApp` opens the details dialog on its Files
+tab; verify, reannounce and copy magnet are the details dialog's job),
 click-outside dismissal (via focus-window change), and Escape layering —
 selection first, then the search, then the window.
 

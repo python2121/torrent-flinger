@@ -128,7 +128,8 @@ class SetLocationDialog(QDialog):
 
 
 class DetailsDialog(QDialog):
-    def __init__(self, client, torrent_id: int, name: str, parent=None):
+    def __init__(self, client, torrent_id: int, name: str, parent=None,
+                 tab: str = ""):
         super().__init__(parent)
         self.setAttribute(Qt.WA_DeleteOnClose)
         self.setWindowTitle(name)
@@ -167,6 +168,7 @@ class DetailsDialog(QDialog):
         self.tabs.addTab(self._build_peers(), "Peers")
         self.tabs.addTab(self._build_trackers(), "Trackers")
         self.tabs.addTab(self._build_options(), "Options")
+        self.show_tab(tab)
 
         root = QVBoxLayout(self)
         root.addLayout(bar)
@@ -176,6 +178,15 @@ class DetailsDialog(QDialog):
         self.timer = QTimer(self, interval=REFRESH_MS, timeout=self._refresh)
         self.timer.start()
         self._refresh()
+
+    def show_tab(self, title: str) -> None:
+        """Raise the tab with this label; an unknown or empty label leaves the
+        current one alone. Matched by label rather than index so the popup's
+        "Torrent files…" entry doesn't break if a tab is inserted."""
+        for i in range(self.tabs.count()):
+            if self.tabs.tabText(i) == title:
+                self.tabs.setCurrentIndex(i)
+                return
 
     # --- tab construction --------------------------------------------------
 

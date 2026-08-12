@@ -173,22 +173,47 @@ class PopupTest(unittest.TestCase):
     def test_context_menu_contents(self):
         popup, _ = self.make_popup()
         popup._on_row_clicked(1, Qt.NoModifier)
+        # torrent 1 is downloading; the entries the details window owns
+        # (verify, reannounce, copy magnet) are deliberately not here
         single = [a.text() for a in popup._build_context_menu([1]).actions()
                   if a.text()]
-        self.assertIn("Details…", single)
-        self.assertIn("Resume", single)
-        self.assertIn("Remove…", single)
+        self.assertEqual(single, ["Pause", "Torrent files…", "Details…", "Remove…"])
         multi = [a.text() for a in popup._build_context_menu([1, 2, 3]).actions()
                  if a.text()]
-        self.assertIn("Pause (3)", multi)
-        self.assertIn("Copy magnet links", multi)
         self.assertNotIn("Details…", multi)
+        self.assertNotIn("Torrent files…", multi)
+        self.assertIn("Remove (3)…", multi)
         # right-click on an unselected row reselects to just that row
         popup._on_row_context = popup._on_row_context  # (exec not called in tests)
         got = []
         popup.remove_many.connect(lambda ids, d: got.append((list(ids), d)))
         popup.remove_many.emit([1, 2], True)
         self.assertEqual(got, [([1, 2], True)])
+
+    def test_pause_and_resume_follow_the_torrent_state(self):
+        popup, _ = self.make_popup()   # 1 downloading, 2 seeding, 3 and 4 stopped
+        def entries(ids):
+            return [a.text() for a in popup._build_context_menu(ids).actions()
+                    if a.text()]
+        self.assertIn("Pause", entries([1]))          # downloading: only Pause
+        self.assertNotIn("Resume", entries([1]))
+        self.assertIn("Pause", entries([2]))          # seeding still counts as running
+        self.assertNotIn("Resume", entries([2]))
+        self.assertIn("Resume", entries([3]))         # stopped: only Resume
+        self.assertNotIn("Pause", entries([3]))
+        mixed = entries([1, 3])                       # a mixed selection gets both
+        self.assertIn("Pause (2)", mixed)
+        self.assertIn("Resume (2)", mixed)
+        self.assertEqual(entries([3, 4]), ["Resume (2)", "Remove (2)…"])
+
+    def test_torrent_files_entry_asks_for_that_torrent(self):
+        popup, _ = self.make_popup()
+        got = []
+        popup.files_requested.connect(got.append)
+        action = next(a for a in popup._build_context_menu([2]).actions()
+                      if a.text() == "Torrent files…")
+        action.trigger()
+        self.assertEqual(got, [2])
 
     def test_reveal_in_dolphin_entry(self):
         popup, _ = self.make_popup()   # rows have downloadDir "/data"
@@ -404,12 +429,22 @@ class DetailsDialogTest(unittest.TestCase):
     def tearDownClass(cls):
         cls.server.shutdown()
 
-    def _dialog(self):
+    def _dialog(self, **kw):
         from flinger.core.transmission import TransmissionClient
         from flinger.ui.details_dialog import DetailsDialog
         client = TransmissionClient(
             f"http://127.0.0.1:{self.server.server_address[1]}/rpc")
-        return DetailsDialog(client, 1, "test.iso")
+        return DetailsDialog(client, 1, "test.iso", **kw)
+
+    def test_opens_on_the_requested_tab(self):
+        dialog = self._dialog(tab="Files")
+        self.assertEqual(dialog.tabs.tabText(dialog.tabs.currentIndex()), "Files")
+        dialog.show_tab("Info")
+        self.assertEqual(dialog.tabs.tabText(dialog.tabs.currentIndex()), "Info")
+        dialog.show_tab("Nonexistent")   # unknown label leaves the tab alone
+        self.assertEqual(dialog.tabs.tabText(dialog.tabs.currentIndex()), "Info")
+        dialog.timer.stop()
+        dialog.close()
 
     def test_details_populates_and_edits(self):
         dialog = self._dialog()
@@ -607,6 +642,33 @@ class AppIntegrationTest(unittest.TestCase):
                 lambda: any(c[0] == "session-set" and c[1].get("alt-speed-enabled")
                             for c in MockRPC.calls)))
         finally:
+            flinger.timer.stop()
+            flinger.tray.hide()
+
+    def test_files_request_opens_the_details_dialog_on_files(self):
+        from flinger.ui.app import FlingerApp
+        flinger = FlingerApp(self.app)
+        dialog = None
+        try:
+            self.assertTrue(wait_until(lambda: len(flinger.popup._rows) == 1),
+                            "poll never populated the popup")
+            flinger.popup.files_requested.emit(1)
+            dialog = flinger._details[1]
+            current = lambda: dialog.tabs.tabText(dialog.tabs.currentIndex())
+            self.assertEqual(current(), "Files")
+            # Asking again while the window is up re-raises its Files tab
+            # rather than leaving the user wherever they had browsed to.
+            dialog.show_tab("Peers")
+            flinger.popup.files_requested.emit(1)
+            self.assertIs(flinger._details[1], dialog, "opened a second window")
+            self.assertEqual(current(), "Files")
+            # Plain "Details…" on the same open window doesn't yank the tab back.
+            flinger.popup.details_requested.emit(1)
+            self.assertEqual(current(), "Files")
+        finally:
+            if dialog is not None:
+                dialog.timer.stop()
+                dialog.close()
             flinger.timer.stop()
             flinger.tray.hide()
 

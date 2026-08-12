@@ -235,22 +235,27 @@ struct TorrentRowView: View {
         store.selectedIDs.contains(torrent.id) ? store.selectedInVisualOrder : [torrent.id]
     }
 
+    /// Only the entries that can act on this selection: Resume when something
+    /// in it is stopped, Pause when something in it is running. Verify,
+    /// reannounce and copy magnet are the details window's business.
     @ViewBuilder
     private var contextMenu: some View {
         let ids = targets
         let suffix = ids.count == 1 ? "" : " (\(ids.count))"
-        Button("Resume\(suffix)") { store.start(ids) }
-        Button("Pause\(suffix)") { store.stop(ids) }
-        Divider()
-        Button("Verify\(suffix)") { store.verify(ids) }
-        Button("Reannounce\(suffix)") { store.reannounce(ids) }
-        Button("Copy magnet link\(ids.count == 1 ? "" : "s")") { store.copyMagnets(for: ids) }
+        let selected = ids.compactMap { store.torrent(id: $0) }
+        if selected.contains(where: { $0.isPaused }) {
+            Button("Resume\(suffix)") { store.start(ids) }
+        }
+        if selected.contains(where: { !$0.isPaused }) {
+            Button("Pause\(suffix)") { store.stop(ids) }
+        }
         if ids.count == 1 {
             Divider()
-            Button("Details…") { actions.showDetails(ids[0]) }
             if store.canReveal(ids[0]) {
                 Button("Reveal in Finder") { store.revealInFinder(ids[0]) }
             }
+            Button("Torrent files…") { actions.showFiles(ids[0]) }
+            Button("Details…") { actions.showDetails(ids[0]) }
         }
         Divider()
         Button("Remove\(suffix)…") { confirmRemove(ids) }

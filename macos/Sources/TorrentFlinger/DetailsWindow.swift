@@ -15,9 +15,11 @@ final class DetailsWindowController {
     /// Called when the user closes the window, so `AppDelegate` can forget it.
     var onClose: (() -> Void)?
 
-    init(store: TorrentStore, torrentID: Int, name: String) {
+    init(store: TorrentStore, torrentID: Int, name: String,
+         tab: DetailsViewModel.Tab = .info) {
         self.name = name
         self.model = DetailsViewModel(store: store, torrentID: torrentID)
+        model.selectedTab = tab
         model.onGone = { [weak self] in self?.window.close() }
         window.onClose = { [weak self] in
             self?.model.stop()
@@ -30,6 +32,12 @@ final class DetailsWindowController {
                        size: NSSize(width: 720, height: 560),
                        root: DetailsView(model: model))
         model.start()
+    }
+
+    /// Raise a tab on a window that's already open, so re-picking "Torrent
+    /// files…" for a torrent whose window is up still lands on the Files tab.
+    func select(tab: DetailsViewModel.Tab) {
+        model.selectedTab = tab
     }
 }
 

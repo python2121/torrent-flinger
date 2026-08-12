@@ -421,8 +421,6 @@ final class TorrentStore: ObservableObject {
     func stop(_ ids: [Int]) { perform("Couldn't pause") { try await $0.stop(ids) } }
     func startAll() { perform("Couldn't start all") { try await $0.start(nil) } }
     func stopAll() { perform("Couldn't pause all") { try await $0.stop(nil) } }
-    func verify(_ ids: [Int]) { perform("Couldn't verify") { try await $0.verify(ids) } }
-    func reannounce(_ ids: [Int]) { perform("Couldn't reannounce") { try await $0.reannounce(ids) } }
 
     func remove(_ ids: [Int], deleteData: Bool) {
         selectedIDs.subtract(ids)

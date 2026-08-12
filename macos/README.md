@@ -47,7 +47,9 @@ slide-and-fade in, dismissed by an outside click or Escape):
   Details / Copy magnet / Reveal in Finder / Remove
 - Click to select, ⇧-click for a range, ⌘-click to toggle, ↑/↓ to walk the
   list (scrolling the row into view), ⇧↑/⇧↓ to extend; right-click acts on
-  the whole selection (resume, pause, verify, reannounce, copy magnets, remove)
+  the whole selection — Resume or Pause (only whichever applies to what's
+  selected) and Remove, plus, on a single row, Reveal in Finder, Torrent
+  files… (straight to the details window's Files tab) and Details…
 - Clipboard magnet detection: open the panel with a magnet link copied and it
   offers to add it
 - Footer: aggregate speeds, torrent count, **free disk space on the server**,

@@ -48,14 +48,12 @@ class FlingerApp(QObject):
         self.popup.remove_clicked.connect(
             lambda tid, data: self._action(lambda: self.client.remove([tid], data)))
         self.popup.details_requested.connect(self._open_details)
+        self.popup.files_requested.connect(
+            lambda tid: self._open_details(tid, tab="Files"))
         self.popup.pause_many.connect(
             lambda ids: self._action(lambda: self.client.stop(list(ids))))
         self.popup.resume_many.connect(
             lambda ids: self._action(lambda: self.client.start(list(ids))))
-        self.popup.verify_many.connect(
-            lambda ids: self._action(lambda: self.client.verify(list(ids))))
-        self.popup.reannounce_many.connect(
-            lambda ids: self._action(lambda: self.client.reannounce(list(ids))))
         self.popup.remove_many.connect(
             lambda ids, delete: self._action(
                 lambda: self.client.remove(list(ids), delete)))
@@ -317,10 +315,14 @@ class FlingerApp(QObject):
         dialog.setAttribute(Qt.WA_DeleteOnClose)
         dialog.show()
 
-    def _open_details(self, torrent_id: int):
+    def _open_details(self, torrent_id: int, tab: str = ""):
+        """`tab` is a tab label to open on; empty means "leave it alone" — a
+        plain Details… on an already-open window shouldn't yank the user back
+        to Info, but "Torrent files…" should always land on Files."""
         existing = self._details.get(torrent_id)
         if existing is not None:
             try:
+                existing.show_tab(tab)
                 existing.raise_()
                 existing.activateWindow()
                 return
@@ -329,7 +331,7 @@ class FlingerApp(QObject):
         from .details_dialog import DetailsDialog
         row = self.popup._rows.get(torrent_id)
         name = row._t.get("name", "Torrent") if row else "Torrent"
-        dialog = DetailsDialog(self.client, torrent_id, name)
+        dialog = DetailsDialog(self.client, torrent_id, name, tab=tab)
         dialog.destroyed.connect(lambda: self._details.pop(torrent_id, None))
         self._details[torrent_id] = dialog
         dialog.show()

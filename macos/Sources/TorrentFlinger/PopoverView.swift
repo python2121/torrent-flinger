@@ -9,6 +9,8 @@ struct PopoverActions {
     var addClipboardMagnet: () -> Void = {}
     var addLink: (String) -> Void = { _ in }
     var showDetails: (Int) -> Void = { _ in }
+    /// The same window as `showDetails`, opened on its Files tab.
+    var showFiles: (Int) -> Void = { _ in }
     var showOptions: () -> Void = {}
     var showStats: () -> Void = {}
     var quit: () -> Void = {}

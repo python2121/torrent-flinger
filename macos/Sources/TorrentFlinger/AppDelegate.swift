@@ -187,15 +187,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         stats.show()
     }
 
-    /// One details window per torrent, reused while it stays open.
-    func showDetails(_ torrentID: Int) {
+    /// One details window per torrent, reused while it stays open. A nil `tab`
+    /// leaves the tab alone — a second Details… shouldn't yank an open window
+    /// back to Info, but "Torrent files…" should always land on Files.
+    func showDetails(_ torrentID: Int, tab: DetailsViewModel.Tab? = nil) {
         closePanel()
         if let existing = details[torrentID] {
+            if let tab { existing.select(tab: tab) }
             existing.show()
             return
         }
         let name = store.torrent(id: torrentID)?.name ?? "Torrent"
-        let controller = DetailsWindowController(store: store, torrentID: torrentID, name: name)
+        let controller = DetailsWindowController(store: store, torrentID: torrentID,
+                                                 name: name, tab: tab ?? .info)
         controller.onClose = { [weak self] in self?.details[torrentID] = nil }
         details[torrentID] = controller
         controller.show()
@@ -211,6 +215,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 addClipboardMagnet: { [weak self] in self?.addMagnetFromClipboard() },
                 addLink: { [weak self] link in self?.handleLink(link) },
                 showDetails: { [weak self] id in self?.showDetails(id) },
+                showFiles: { [weak self] id in self?.showDetails(id, tab: .files) },
                 showOptions: { [weak self] in self?.showOptions() },
                 showStats: { [weak self] in self?.showStats() },
                 quit: { NSApp.terminate(nil) }

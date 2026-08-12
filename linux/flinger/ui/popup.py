@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..core import transmission as tr
 from ..core.formats import fmt_size, fmt_speed, link_display_name, resolve_local_path
 from .style import NEGATIVE, POSITIVE, argb, build_stylesheet, small_font
 from .torrent_row import TorrentRow
@@ -50,6 +51,7 @@ class Popup(QWidget):
     resume_clicked = Signal(int)
     remove_clicked = Signal(int, bool)
     details_requested = Signal(int)
+    files_requested = Signal(int)
     add_link = Signal(str)
     add_file_requested = Signal()
     open_web_requested = Signal()
@@ -59,8 +61,6 @@ class Popup(QWidget):
     # batch actions from the selection context menu (lists of torrent ids)
     pause_many = Signal(list)
     resume_many = Signal(list)
-    verify_many = Signal(list)
-    reannounce_many = Signal(list)
     remove_many = Signal(list, bool)
 
     def __init__(self, parent=None):
@@ -445,30 +445,34 @@ class Popup(QWidget):
         menu = self._build_context_menu(self.selected_ids())
         menu.exec(global_pos)
 
+    def _is_paused(self, tid: int) -> bool:
+        row = self._rows.get(tid)
+        return row is not None and row._t.get("status", 0) == tr.STATUS_STOPPED
+
     def _build_context_menu(self, ids: list[int]) -> QMenu:
+        """Only the entries that can act on this selection: Resume when
+        something in it is stopped, Pause when something in it is running.
+        Verify / reannounce / copy magnet are details-window business."""
         menu = QMenu(self)
         n = len(ids)
         suffix = "" if n == 1 else f" ({n})"
-        menu.addAction(QAction(f"Resume{suffix}", menu,
-                               triggered=lambda: self.resume_many.emit(ids)))
-        menu.addAction(QAction(f"Pause{suffix}", menu,
-                               triggered=lambda: self.pause_many.emit(ids)))
-        menu.addSeparator()
-        menu.addAction(QAction(f"Verify{suffix}", menu,
-                               triggered=lambda: self.verify_many.emit(ids)))
-        menu.addAction(QAction(f"Reannounce{suffix}", menu,
-                               triggered=lambda: self.reannounce_many.emit(ids)))
-        menu.addAction(QAction("Copy magnet link" + ("s" if n > 1 else ""), menu,
-                               triggered=lambda: self._copy_magnets(ids)))
+        if any(self._is_paused(i) for i in ids):
+            menu.addAction(QAction(f"Resume{suffix}", menu,
+                                   triggered=lambda: self.resume_many.emit(ids)))
+        if any(not self._is_paused(i) for i in ids):
+            menu.addAction(QAction(f"Pause{suffix}", menu,
+                                   triggered=lambda: self.pause_many.emit(ids)))
         if n == 1:
             menu.addSeparator()
-            menu.addAction(QAction("Details…", menu,
-                                   triggered=lambda: self.details_requested.emit(ids[0])))
             paths = self._reveal_paths(ids[0])
             if paths:
                 local_dir, item = paths
                 menu.addAction(QAction("Reveal in Dolphin", menu,
                                        triggered=lambda: self._reveal(local_dir, item)))
+            menu.addAction(QAction("Torrent files…", menu,
+                                   triggered=lambda: self.files_requested.emit(ids[0])))
+            menu.addAction(QAction("Details…", menu,
+                                   triggered=lambda: self.details_requested.emit(ids[0])))
         menu.addSeparator()
         menu.addAction(QAction(f"Remove{suffix}…", menu,
                                triggered=lambda: self._confirm_remove(ids)))
@@ -518,15 +522,6 @@ class Popup(QWidget):
             except Exception:  # noqa: BLE001, S110 — any D-Bus trouble → plain open
                 pass
         QDesktopServices.openUrl(QUrl.fromLocalFile(local_dir))
-
-    def _copy_magnets(self, ids: list[int]):
-        links = [self._rows[tid]._t.get("magnetLink", "")
-                 for tid in ids if tid in self._rows]
-        links = [link for link in links if link]
-        if links:
-            QApplication.clipboard().setText("\n".join(links))
-            self.notify.emit("Copied", f"{len(links)} magnet link"
-                             + ("s" if len(links) > 1 else ""))
 
     def _confirm_remove(self, ids: list[int]):
         from PySide6.QtWidgets import QCheckBox, QMessageBox

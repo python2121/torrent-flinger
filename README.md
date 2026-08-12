@@ -43,7 +43,8 @@ hash, piece geometry, peers, trackers, and per-torrent limits.
 this folds them into a directory tree. Folders aggregate size, progress and
 priority, and a folder's checkbox applies to everything inside it — so
 deselecting a season, or setting a whole directory to low priority, is one
-click instead of six hundred.
+click instead of six hundred. Right-click a torrent and **Torrent files…**
+opens straight onto it.
 
 <p align="center">
   <img src="docs/images/details-files.png" alt="The Files tab as a directory tree" width="760">
