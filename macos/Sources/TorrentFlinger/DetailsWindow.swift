@@ -366,15 +366,20 @@ struct DetailsView: View {
             // The outline form of `Table`: folders get a disclosure triangle
             // and their rows aggregate everything underneath, so a 678-file
             // torrent opens as one line you can expand.
+            //
+            // The checkbox rides in the File column rather than a column of its
+            // own, and that placement is load-bearing: SwiftUI draws the
+            // disclosure triangle *and* one indent per level inside the first
+            // column, so a narrow fixed-width column ahead of it has room for
+            // exactly one level. Everything deeper loses its triangle and its
+            // indent, and the tree looks like it stops two levels down — which
+            // is what a leading `.width(20)` checkbox column did here.
             Table(model.fileTree, children: \.children, selection: $model.selectedFiles) {
-                TableColumn("") { node in
-                    FileCheckbox(state: node.wanted) {
-                        model.setWanted(node.indices, wanted: node.wanted.toggled)
-                    }
-                }
-                .width(20)
                 TableColumn("File") { node in
                     HStack(spacing: 5) {
+                        FileCheckbox(state: node.wanted) {
+                            model.setWanted(node.indices, wanted: node.wanted.toggled)
+                        }
                         Image(systemName: node.isDirectory ? "folder" : "doc")
                             .foregroundStyle(.secondary)
                         Text(node.name).lineLimit(1).truncationMode(.middle)
@@ -493,10 +498,11 @@ struct DetailsView: View {
     }
 }
 
-/// The Files tab's check control. `Toggle` has no mixed state, and a folder
-/// whose files disagree needs one, so all three states are drawn from SF
-/// Symbols — using a real checkbox for files and a symbol for folders would put
-/// two different controls in the same column.
+/// The Files tab's check control, drawn inline ahead of each row's icon and
+/// name. `Toggle` has no mixed state, and a folder whose files disagree needs
+/// one, so all three states are drawn from SF Symbols — using a real checkbox
+/// for files and a symbol for folders would put two different controls in the
+/// same column.
 struct FileCheckbox: View {
     let state: FileNode.Wanted
     let toggle: () -> Void
