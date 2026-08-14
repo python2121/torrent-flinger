@@ -117,6 +117,15 @@ struct SpeedAverager {
     mutating func record(_ stats: SessionStats, at now: Date) -> Bool {
         let live = Speeds(download: stats.downloadSpeed, upload: stats.uploadSpeed)
 
+        // What the caller is showing right now. Every exit below reports
+        // against this, never against `.zero`, because `reset()` empties
+        // `displayed` on its own — from the gap check immediately below, or
+        // from a caller reaching for it directly. Comparing against `.zero`
+        // instead means a readout that was emptied by a reset reports "nothing
+        // changed", and a caller that only republishes on a change goes on
+        // drawing the last speed it ever heard.
+        let before = displayed
+
         // A gap wider than the widest window breaks continuity: the lid was
         // shut, App Nap throttled the timer, the server went away for a minute.
         // The readings either side aren't one picture, and averaging across the
@@ -141,9 +150,8 @@ struct SpeedAverager {
             // idle all afternoon would open its next download in the widest,
             // slowest tier.
             if samples.isEmpty || now.timeIntervalSince(since) >= Self.idleGrace {
-                let changed = displayed != .zero
                 reset()
-                return changed
+                return displayed != before
             }
         }
 
@@ -162,14 +170,13 @@ struct SpeedAverager {
         // another five seconds.
         let due = tier != lastTier || tier.refresh <= 0
             || lastRefresh.map { now.timeIntervalSince($0) >= tier.refresh } ?? true
-        guard due else { return false }
+        guard due else { return displayed != before }
 
         lastTier = tier
         lastRefresh = now
         let value = tier.window <= 0 ? live : average(over: tier.window, endingAt: now)
-        guard value != displayed else { return false }
         displayed = value
-        return true
+        return displayed != before
     }
 
     /// Drops everything — a disconnect, or a transfer that's over. The next

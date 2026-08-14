@@ -252,6 +252,28 @@ enum SpeedAveragerTests {
             t.equal(averager.displayed.download, 10_000_000, "and it stays right afterwards")
         },
 
+        TestEntry("speed/a-transfer-that-ends-across-a-gap-clears-the-readout") { t in
+            var averager = SpeedAverager()
+            for step in stride(from: 0.0, through: 30.0, by: 2.5) {
+                averager.record(stats(down: 3_000_000, downloaded: Int64(step * 3_000_000)),
+                                at: at(step))
+            }
+            t.expect(averager.displayed.download > 0, "a transfer is on screen")
+
+            // The machine sleeps mid-download; by the time it wakes the torrent
+            // has finished, so the first reading back is zero. Both of this
+            // reading's paths clear the average — the gap breaks continuity and
+            // the zero ends the transfer — so `record` has to report that the
+            // readout changed. Miss it and the caller keeps publishing the last
+            // speed it heard: a menu bar stuck on "↓3.0M" with nothing running,
+            // for as long as nothing else starts.
+            let changed = averager.record(stats(down: 0, downloaded: 90_000_000),
+                                          at: at(30 + 4 * 3600))
+            t.expect(changed, "the caller has to be told the readout emptied")
+            t.equal(averager.displayed, .zero)
+            t.expect(!averager.isTracking, "and the transfer is over")
+        },
+
         TestEntry("speed/a-backward-clock-step-starts-over") { t in
             var averager = SpeedAverager()
             for step in stride(from: 0.0, through: 30.0, by: 2.5) {

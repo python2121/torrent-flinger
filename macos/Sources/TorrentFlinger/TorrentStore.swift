@@ -189,7 +189,14 @@ final class TorrentStore: ObservableObject {
     private func applyStats(_ stats: SessionStats) {
         self.stats = stats
         let previousWindow = speedAverager.windowDescription
-        if speedAverager.record(stats, at: Date()) {
+        speedAverager.record(stats, at: Date())
+        // Compare against what's actually published rather than trusting a
+        // "did it change" flag. The averager empties itself on a discontinuity
+        // as well as on an ended transfer, and a caller that publishes only
+        // when told to can end up holding a speed nothing is producing any
+        // more — a menu bar reading ↓25K with every torrent finished, until
+        // something else starts. This can't drift: it's the same value.
+        if menubarSpeeds != speedAverager.displayed {
             menubarSpeeds = speedAverager.displayed
         }
         // Only on a change — two or three lines per transfer. Which window the
