@@ -34,7 +34,7 @@ poll buys little against an attacker who can already read your home directory.
 | `verify_tls` | bool | `true` | Verify the certificate; off for self-signed NAS certs |
 | `notify_on_add` | bool | `true` | Notify when a torrent is accepted |
 | `notify_on_finish` | bool | `true` | Notify when one completes |
-| `poll_interval_ms` | int | `3000` | Poll cadence **while the panel is open** (30 s is hard-coded while closed) |
+| `poll_interval_ms` | int | `3000` | Poll cadence **while the panel is open**. While it's closed, whichever of this and 30 s is slower — closing the panel never speeds polling up |
 | `slow_poll_when_idle` | bool | `true` | Linux only. Back off to 10 s while nothing is downloading or verifying. Never *speeds up* a slower `poll_interval_ms`. macOS ignores it and keeps its own cadence |
 | `start_paused` | bool | `false` | Add torrents paused |
 | `show_add_dialog` | bool | `true` | Show the destination dialog on a new link; off means "use the defaults silently" |
@@ -58,7 +58,9 @@ poll buys little against an attacker who can already read your home directory.
 
 Both apps **ignore keys they don't know** and both fall back to defaults for
 anything missing or malformed — a corrupt config yields a default config, never
-a crash and never an empty file.
+a crash and never an empty file. Malformed includes the wrong *type*: a
+hand-edited `"poll_interval_ms": "3000"` is dropped key by key rather than
+carried into the app to fail somewhere far from the file.
 
 That means adding a key is safe, but:
 

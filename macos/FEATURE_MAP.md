@@ -159,8 +159,9 @@ items with a POSIX file lock.
   forwarding. `App.swift`
 - **Polling** — `TorrentStore` polls `session-get` → `free-space` →
   `torrent-get` → `session-stats` on a `Timer` at the configured interval while
-  the panel is open and every 30 s while it's closed, guarded against
-  reentrancy. Free space is decoration and never fails the poll.
+  the panel is open and no faster than every 30 s while it's closed — a floor,
+  so closing the panel can't speed a slower configured interval up. Guarded
+  against reentrancy. Free space is decoration and never fails the poll.
   `TorrentStore.swift`
 - **Speeds-only tick** — a second `Timer` calling `session-stats` alone every
   2.5 s, running only while the panel is closed, the speeds are switched on and
@@ -303,7 +304,9 @@ items with a POSIX file lock.
   doesn't queue behind a single modal. `AddTorrentWindow.swift`
 - **Options window** — five tabs matching the Linux dialog. *Server*
   (scheme/host/port/paths/credentials/TLS + Test Connection), *General*
-  (notifications, menu-bar speeds, refresh interval), *Download* (start paused,
+  (notifications, menu-bar speeds, and the refresh interval — the same twelve
+  cadences from 1s to 2m the Linux dialog offers, plus whatever off-menu
+  interval a hand-edited config holds), *Download* (start paused,
   show add dialog, and the custom-directory list with radio-exclusive TV
   flagging), *Local* (remote prefix + local mount with a folder picker, which is
   what enables Reveal in Finder), *Limits* (global speed caps, the turtle-mode

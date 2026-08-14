@@ -387,6 +387,34 @@ class TestConfig(unittest.TestCase):
             finally:
                 os.environ["TORRENT_FLINGER_CONFIG_DIR"] = previous
 
+    def test_load_drops_a_key_whose_value_is_the_wrong_type(self):
+        """A hand-edited value falls back per key rather than poisoning the app.
+
+        A string interval would otherwise reach the poll timer and the options
+        dialog — and the dialog is where you'd go to correct it. The macOS
+        build's decoder falls back key by key for the same reason.
+        """
+        from flinger.core.config import config_path
+        previous = os.environ["TORRENT_FLINGER_CONFIG_DIR"]
+        with tempfile.TemporaryDirectory() as tmp:
+            os.environ["TORRENT_FLINGER_CONFIG_DIR"] = tmp
+            try:
+                config_path().parent.mkdir(parents=True, exist_ok=True)
+                config_path().write_text(json.dumps({
+                    "host": "nas", "port": 9999,
+                    "poll_interval_ms": "5000", "verify_tls": "no",
+                    "custom_dirs": {"label": "TV"}, "notify_on_add": 0,
+                }))
+                cfg = Config.load()
+                self.assertEqual(cfg.host, "nas", "good keys still land")
+                self.assertEqual(cfg.port, 9999)
+                self.assertEqual(cfg.poll_interval_ms, 3000)
+                self.assertTrue(cfg.verify_tls)
+                self.assertEqual(cfg.custom_dirs, [])
+                self.assertTrue(cfg.notify_on_add, "0 is not a bool")
+            finally:
+                os.environ["TORRENT_FLINGER_CONFIG_DIR"] = previous
+
 
 if __name__ == "__main__":
     unittest.main()
@@ -548,8 +576,9 @@ class TestFileTree(unittest.TestCase):
 
 
 class TestPolling(unittest.TestCase):
-    """How often the popup refreshes. Linux-only — the macOS build has no idle
-    slow-down — so there's no Swift counterpart to keep in step."""
+    """How often the popup refreshes. The idle slow-down is Linux-only, but the
+    closed-popup floor is mirrored in `TorrentStore.pollInterval` — change one
+    and change the other."""
 
     def test_a_hidden_popup_is_always_lazy(self):
         from flinger.core.polling import HIDDEN_POLL_MS, poll_interval_ms
@@ -559,6 +588,18 @@ class TestPolling(unittest.TestCase):
                     poll_interval_ms(1000, visible=False, active=active,
                                      slow_when_idle=slow), HIDDEN_POLL_MS,
                     "nobody is looking; only the tray glyph depends on this")
+
+    def test_a_hidden_popup_is_never_polled_faster_than_asked(self):
+        from flinger.core.polling import poll_interval_ms
+        # The menu offers intervals slower than HIDDEN_POLL_MS, so the closed
+        # case is a floor rather than a cadence. Otherwise picking 2m to spare a
+        # sleepy server would be polled every 30s the moment the popup closed —
+        # the lazy case busier than the visible one.
+        for active in (True, False):
+            for slow in (True, False):
+                self.assertEqual(
+                    poll_interval_ms(120000, visible=False, active=active,
+                                     slow_when_idle=slow), 120000)
 
     def test_idle_slow_down_is_opt_out_and_only_applies_while_idle(self):
         from flinger.core.polling import IDLE_POLL_MS, poll_interval_ms

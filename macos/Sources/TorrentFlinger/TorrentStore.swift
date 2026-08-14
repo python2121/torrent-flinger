@@ -8,7 +8,9 @@ import SwiftUI
 /// polling half — the window/dialog half lives in `AppDelegate`.
 @MainActor
 final class TorrentStore: ObservableObject {
-    /// Poll cadence while the panel is closed. The visible cadence comes from
+    /// Poll cadence while the panel is closed — a floor, not a fixed cadence,
+    /// or a config asking for something slower would be polled *faster* with
+    /// nobody looking at it. The visible cadence comes from
     /// `config.pollIntervalMs`, exactly as on Linux.
     static let hiddenPollInterval: TimeInterval = 30
 
@@ -99,7 +101,8 @@ final class TorrentStore: ObservableObject {
     // MARK: Polling
 
     private var pollInterval: TimeInterval {
-        panelVisible ? Double(config.pollIntervalMs) / 1000 : Self.hiddenPollInterval
+        let configured = Double(config.pollIntervalMs) / 1000
+        return panelVisible ? configured : max(configured, Self.hiddenPollInterval)
     }
 
     private func startTimer() {

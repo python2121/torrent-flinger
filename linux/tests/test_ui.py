@@ -279,6 +279,14 @@ class PopupTest(unittest.TestCase):
         self.assertEqual(odd.poll.count(), len(POLL_CHOICES) + 1)
         self.assertEqual(odd.to_config().poll_interval_ms, 4500)
 
+        # An interval that isn't a usable number mustn't take the dialog down
+        # with it — the dialog is the only place to correct it from, and saving
+        # writes the default back over it.
+        for junk in ("5000", 0, -1, True):
+            broken = OptionsDialog(Config(poll_interval_ms=junk))
+            self.assertEqual(broken.poll.count(), len(POLL_CHOICES))
+            self.assertEqual(broken.to_config().poll_interval_ms, 3000)
+
     def test_escape_clears_search_then_closes(self):
         popup, _ = self.make_popup()
         popup.show()

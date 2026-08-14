@@ -30,11 +30,48 @@ final class OptionsWindowController {
     }
 }
 
+/// The refresh cadences offered in the General tab, key-for-key with the Linux
+/// build's `POLL_CHOICES`. A free enum rather than a member of the `@MainActor`
+/// view model so the self-tests, which don't run on the main actor, can reach
+/// the rules below.
+enum PollChoices {
+    static let menu: [(ms: Int, label: String)] =
+        [(1000, "1s"), (2000, "2s"), (3000, "3s"), (5000, "5s"),
+         (7000, "7s"), (10000, "10s"), (15000, "15s"), (20000, "20s"),
+         (30000, "30s"), (45000, "45s"), (60000, "1m"), (120000, "2m")]
+
+    /// Where an unusable interval lands. Matches `Config`'s own default, so
+    /// saving writes a sane value back over the bad one.
+    static let fallback = 3000
+
+    /// Seconds without trailing zeroes, the same shape Python's `:g` gives:
+    /// 4500 → "4.5s".
+    static func label(ms: Int) -> String {
+        String(format: "%gs", Double(ms) / 1000)
+    }
+
+    /// `menu`, plus `current` when it isn't already on it. A config edited by
+    /// hand can hold an interval the menu doesn't offer; it's offered as-is
+    /// rather than silently rounded to a neighbour the user didn't pick. Zero
+    /// and negative intervals are not offered — they'd spin the poll timer.
+    static func offered(current: Int) -> [(ms: Int, label: String)] {
+        guard current > 0, !menu.contains(where: { $0.ms == current }) else { return menu }
+        return (menu + [(ms: current, label: label(ms: current))]).sorted { $0.ms < $1.ms }
+    }
+
+    /// The interval the picker should start on. An unusable one must not leave
+    /// the picker on a value nothing in the list carries — SwiftUI would draw
+    /// it blank, and this window is the only place to correct it from.
+    static func selection(current: Int) -> Int {
+        current > 0 ? current : fallback
+    }
+}
+
 @MainActor
 final class OptionsViewModel: ObservableObject {
-    /// Refresh cadences offered in the General tab, matching the Linux build.
-    static let pollChoices: [(ms: Int, label: String)] =
-        [(1000, "1s"), (3000, "3s"), (10000, "10s"), (30000, "30s")]
+    /// Fixed at init rather than recomputed per redraw: picking a listed value
+    /// mustn't make an off-menu one disappear out from under the picker.
+    let pollChoices: [(ms: Int, label: String)]
 
     /// The `session-get` keys the Limits tab reads and writes.
     static let sessionKeys = [
@@ -75,8 +112,11 @@ final class OptionsViewModel: ObservableObject {
 
     init(store: TorrentStore) {
         self.store = store
-        self.draft = store.config
+        var draft = store.config
+        draft.pollIntervalMs = PollChoices.selection(current: draft.pollIntervalMs)
+        self.draft = draft
         self.dirs = store.config.customDirs
+        self.pollChoices = PollChoices.offered(current: draft.pollIntervalMs)
     }
 
     // MARK: Custom directories
@@ -325,7 +365,7 @@ struct OptionsView: View {
             Toggle("Desktop notification when a torrent finishes", isOn: $model.draft.notifyOnFinish)
             Toggle("Show transfer speeds in the menu bar", isOn: $model.draft.menubarShowSpeeds)
             Picker("Popup refresh interval", selection: $model.draft.pollIntervalMs) {
-                ForEach(OptionsViewModel.pollChoices, id: \.ms) { choice in
+                ForEach(model.pollChoices, id: \.ms) { choice in
                     Text(choice.label).tag(choice.ms)
                 }
             }

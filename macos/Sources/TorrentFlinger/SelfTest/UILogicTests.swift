@@ -2,9 +2,11 @@
 import Foundation
 
 /// The pure logic behind the popover list and the options window: grouping +
-/// search, list selection arithmetic, and the custom-directory rules. These
-/// live in `Core` precisely so they can be exercised without standing up a
-/// `TorrentStore` (which would start a poll timer and hit the network).
+/// search, list selection arithmetic, the custom-directory rules, and the
+/// refresh-interval menu. All of it sits outside the `@MainActor` view models —
+/// in `Core`, or in a free enum beside the view that uses it — precisely so it
+/// can be exercised without standing up a `TorrentStore` (which would start a
+/// poll timer and hit the network).
 enum UILogicTests {
     /// Build a torrent with just the fields the grouping rules read.
     private static func torrent(_ id: Int, _ name: String,
@@ -272,6 +274,39 @@ enum UILogicTests {
 
             t.isNil(CustomDir.make(label: "x", dir: "   ", tv: false),
                     "a blank path yields no entry rather than an unusable one")
+        },
+
+        TestEntry("options/poll-choices-match-the-linux-menu") { t in
+            // POLL_CHOICES in linux/flinger/ui/options_dialog.py. Both builds
+            // read one config key, so an interval offered by one and not the
+            // other is an interval the other can't display.
+            t.equal(PollChoices.menu.map(\.ms),
+                    [1000, 2000, 3000, 5000, 7000, 10000, 15000, 20000,
+                     30000, 45000, 60000, 120000])
+            t.equal(PollChoices.menu.map(\.label),
+                    ["1s", "2s", "3s", "5s", "7s", "10s", "15s", "20s",
+                     "30s", "45s", "1m", "2m"])
+        },
+
+        TestEntry("options/an-off-menu-interval-is-offered-not-rounded") { t in
+            let offered = PollChoices.offered(current: 4500)
+            t.equal(offered.count, PollChoices.menu.count + 1)
+            t.equal(offered.first { $0.ms == 4500 }?.label, "4.5s")
+            t.equal(offered.map(\.ms), offered.map(\.ms).sorted(),
+                    "inserted in order, not appended after 2m")
+            t.equal(PollChoices.offered(current: 3000).count, PollChoices.menu.count,
+                    "one already on the menu isn't listed twice")
+        },
+
+        TestEntry("options/an-unusable-interval-falls-back-to-the-default") { t in
+            // Zero would spin the poll timer, and either would leave the picker
+            // on a value nothing in the list carries — drawn blank, in the one
+            // window you'd correct it from.
+            for junk in [0, -1] {
+                t.equal(PollChoices.selection(current: junk), 3000)
+                t.equal(PollChoices.offered(current: junk).count, PollChoices.menu.count)
+            }
+            t.equal(PollChoices.selection(current: 4500), 4500, "a usable one stands")
         },
     ]
 }

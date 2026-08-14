@@ -49,7 +49,7 @@ Pure stdlib. Every module here has a Swift counterpart under
 | `formats.py` | `fmt_size`, `fmt_speed` (SI, 1000-based), `fmt_eta`, `status_name`, `fmt_date`, `map_remote_path`, `common_remote_root`, `resolve_local_path`, `link_display_name`. |
 | `tvdetect.py` | `looks_like_tv(name)` → `(bool, reason)` on `S01E02`, `1x02`, air dates and season packs; `find_tv_dir(custom_dirs)` returns the first directory flagged `tv`. |
 | `trayicon.py` | `tray_icon(connected, download_speed, recently_added)` → one of four state names, and `ADDED_DURATION_S = 3.0`. The precedence rule is duplicated in Swift with a test on both sides asserting the same 3 s. |
-| `polling.py` | `poll_interval_ms(configured, visible, active, slow_when_idle)` and `any_active(torrents)` — the popup's refresh cadence, including the 10 s idle back-off. The one module here with **no** Swift counterpart: macOS has no idle slow-down, so there's no shared rule to keep in step. |
+| `polling.py` | `poll_interval_ms(configured, visible, active, slow_when_idle)` and `any_active(torrents)` — the popup's refresh cadence, including the 10 s idle back-off. Both back-offs are floors: neither polls faster than the configured interval. The one module here with **no** Swift counterpart file, though `TorrentStore.pollInterval` duplicates the closed-panel floor inline; only the idle slow-down is Linux-only. |
 | `filetree.py` | `build_tree(files, fileStats)` folds Transmission's flat path list into a directory tree, aggregating size, progress, wanted (tri-state) and priority; `indices_for(ids, tree)` resolves selected rows back to file indices. Pure, so it's tested without a server. Ported from `FileTree.swift` — same ids, same ordering. |
 
 ## `linux/flinger/ui/` — PySide6
@@ -60,8 +60,9 @@ Owns the tray icon, its context menu, the poll timer, the config, the client,
 and every action. Roughly the counterpart of `TorrentStore` + `AppDelegate` on
 macOS.
 
-- **Polling**: `QTimer` at `poll_interval_ms` while the popup is visible,
-  `HIDDEN_POLL_MS` (30 s) while it isn't. The switch is driven by an event
+- **Polling**: `QTimer` at `poll_interval_ms` while the popup is visible, and no
+  faster than `HIDDEN_POLL_MS` (30 s) while it isn't — the back-offs are floors,
+  so an interval slower than 30 s is left alone. The switch is driven by an event
   filter on the popup's Show/Hide, not by a signal. `_polling` guards
   reentrancy. One poll fetches `session-get(["download-dir"])` → `free-space` →
   `torrents` → `session-stats`, all on a worker thread, and `free-space`

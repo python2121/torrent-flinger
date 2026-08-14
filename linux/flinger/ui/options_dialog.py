@@ -118,15 +118,20 @@ class OptionsDialog(QDialog):
         self.notify_finish.setChecked(config.notify_on_finish)
         self.poll = QComboBox()
         choices = list(POLL_CHOICES)
-        # A config edited by hand can hold an interval that isn't on the menu.
-        # Offer it rather than silently rounding the user's setting to a
-        # neighbour they didn't pick.
-        if config.poll_interval_ms not in [ms for ms, _ in choices]:
-            choices.append((config.poll_interval_ms, f"{config.poll_interval_ms / 1000:g}s"))
+        current = config.poll_interval_ms
+        # An interval that isn't a usable number can't be offered, and mustn't
+        # be the reason the dialog won't open — this is the only place to
+        # correct it from. Anything else a config edited by hand holds is
+        # offered as-is, rather than silently rounded to a neighbour the user
+        # didn't pick.
+        if not isinstance(current, int) or isinstance(current, bool) or current <= 0:
+            current = Config().poll_interval_ms
+        if current not in [ms for ms, _ in choices]:
+            choices.append((current, f"{current / 1000:g}s"))
             choices.sort()
         for ms, label in choices:
             self.poll.addItem(label, ms)
-        self.poll.setCurrentIndex([ms for ms, _ in choices].index(config.poll_interval_ms))
+        self.poll.setCurrentIndex([ms for ms, _ in choices].index(current))
         self.slow_idle = QCheckBox(
             f"Slow to {IDLE_POLL_MS // 1000}s when nothing is downloading")
         self.slow_idle.setToolTip(

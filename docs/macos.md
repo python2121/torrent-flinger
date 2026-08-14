@@ -73,8 +73,9 @@ anything with branching worth testing gets pushed down here first.
 config, the client, selection and expansion state, every mutating action,
 finish notifications, and remote→local path resolution.
 
-- Poll cadence: `config.pollIntervalMs` while the panel is open, 30 s while
-  closed, guarded against reentrancy by `isPolling`.
+- Poll cadence: `config.pollIntervalMs` while the panel is open, and no faster
+  than 30 s while closed (a floor, so a config asking for something slower keeps
+  it), guarded against reentrancy by `isPolling`.
 - Mutating actions run the RPC and then re-poll, so the UI never shows an
   optimistic guess.
 - `client` is injectable — that's the seam `--demo` uses (below).

@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import os
 import sys
-from dataclasses import asdict, dataclass, field
+from dataclasses import MISSING, asdict, dataclass, field
 from pathlib import Path
 
 APP_NAME = "torrent-flinger"
@@ -73,8 +73,27 @@ class Config:
             data = json.loads(config_path().read_text())
         except (OSError, ValueError):
             return cls()
-        known = {f for f in cls.__dataclass_fields__}
-        return cls(**{k: v for k, v in data.items() if k in known})
+        return cls(**{k: v for k, v in data.items() if cls._usable(k, v)})
+
+    @classmethod
+    def _usable(cls, key: str, value) -> bool:
+        """Whether a key is one we know, holding a value of the right type.
+
+        Type matters as much as the name: a hand-edited `"poll_interval_ms":
+        "3000"` would otherwise sail in as a string and fail somewhere far from
+        the file — in the timer, or in the very dialog you'd fix it from. Each
+        key falls back to its default instead, which is what the macOS build's
+        decoder does key by key.
+        """
+        f = cls.__dataclass_fields__.get(key)
+        if f is None:
+            return False
+        default = f.default_factory() if f.default is MISSING else f.default
+        if isinstance(default, bool):
+            return isinstance(value, bool)
+        if isinstance(default, int):  # bools are ints; an interval of True isn't
+            return isinstance(value, int) and not isinstance(value, bool)
+        return isinstance(value, type(default))
 
     def save(self) -> None:
         config_dir().mkdir(parents=True, exist_ok=True)

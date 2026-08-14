@@ -59,6 +59,13 @@ enum ConfigTests {
             t.equal(config.host, "nas")
             t.equal(config.port, 9091, "a bad value yields the default, never a throw")
             t.equal(config.rpcPath, "/transmission/rpc")
+
+            // The Linux build drops wrong-typed keys the same way, for the same
+            // reason: a string interval reaching the poll timer — or the very
+            // options window you'd correct it from — fails far from the file.
+            let quoted = #"{"poll_interval_ms": "5000"}"#
+            let hand = try JSONDecoder().decode(Config.self, from: Data(quoted.utf8))
+            t.equal(hand.pollIntervalMs, 3000, "a quoted interval is not an interval")
         },
 
         TestEntry("config/custom-dir-omits-false-tv-flag") { t in
