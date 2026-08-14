@@ -210,6 +210,24 @@ break the other target.
   because tuples aren't `Equatable`. Reproduce by leaving the popover open and
   running `torrent-start`/`torrent-stop` over RPC from another shell; the row's
   `body` re-runs with the right data either way, so only the pixels tell you.
+- **The popover list hides its scroll indicators, and that's load-bearing.**
+  An overlay `NSScroller` draws over the trailing ~17pt of the list, but while
+  it's *revealed* — the flash when the panel opens, or any scroll — its live
+  hit strip reaches ≈33pt in from the edge, squarely over every row's chevron.
+  A click there hits the scroller knob: nothing visible happens, the scroller
+  collapses, and the *next* click at the same coordinates reaches the button.
+  That's the "first click after opening does nothing" bug, and it cost a long
+  session because every plausible explanation is wrong. It isn't
+  `acceptsFirstMouse` (the event *is* delivered, just to the scroller, and
+  SwiftUI already answers first-mouse correctly per location), it isn't gesture
+  precedence, it isn't row identity, and a bigger hit target *masks* it —
+  clicks landing left of the strip start working, so it looks fixed and returns
+  the moment aiming stops being the obstacle. The keyboard is never affected,
+  which makes it read as one broken control rather than a region of the window.
+  If you ever need the indicator back, budget ≥34pt of trailing dead space per
+  row for it. Diagnose this class of bug by logging `contentView.hitTest` per
+  click in `PopoverPanel.sendEvent` — the hit-test target names the thief
+  immediately, where reasoning about AppKit's input rules does not.
 - `Notifier` is gated on being a real `.app` bundle:
   `UNUserNotificationCenter.current()` traps otherwise, which is exactly the
   `swift run` dev loop. Keep the guard.

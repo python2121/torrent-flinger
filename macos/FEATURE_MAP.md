@@ -256,7 +256,10 @@ items with a POSIX file lock.
   rounded-rect image plus a light-mode `NSBox` tint, animated open/close, placed
   under the status item and clamped on-screen. A global mouse monitor dismisses
   it on outside clicks; Escape clears the selection first, an active search
-  second, and closes the panel third.
+  second, and closes the panel third. The list's scroll indicators are hidden,
+  which is a fix rather than a style choice — a revealed overlay `NSScroller`
+  hit-tests ≈33pt in from the edge, over the chevron column, and eats the first
+  click after the panel opens (see `CLAUDE.md`).
   It follows SwiftUI's `preferredContentSize` so adding a row doesn't make it
   drift. `AppDelegate.swift`
 - **Panel layout** — header (title + connection dot), toolbar (search, add

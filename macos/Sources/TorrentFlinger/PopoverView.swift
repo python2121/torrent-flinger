@@ -190,6 +190,19 @@ struct PopoverView: View {
                 }
                 .frame(maxHeight: maxListHeight)
                 .scrollBounceBehavior(.basedOnSize)
+                // No scrollbar. The overlay scroller sits over the trailing
+                // ~17pt of the list, but while it's *revealed* — the flash when
+                // the panel opens, or any scroll — its live hit strip reaches
+                // ≈33pt in from the edge, squarely over every row's chevron.
+                // A click there goes to the NSScroller knob, does nothing
+                // visible, and collapses the scroller, so the *next* click at
+                // the same point reaches the button: the infamous "first click
+                // after opening does nothing". Verified by logging
+                // `contentView.hitTest` per click in PopoverPanel.sendEvent —
+                // first click hit=NSScroller, second (same coordinates)
+                // hit=PlatformGroupContainer. Trackpad/wheel scrolling is
+                // untouched; only the indicator is gone.
+                .scrollIndicators(.hidden)
                 // Keyboard navigation can land on a row that's scrolled off;
                 // the store asks for it here and we clear the request so the
                 // next press on the same row scrolls again. The row is asked
