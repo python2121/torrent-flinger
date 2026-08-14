@@ -21,6 +21,9 @@ Torrents grouped by status — errors first, then downloading, verifying,
 seeding, paused, finished — with per-group counts, live speeds, ETA and a
 state-coloured progress bar. Search filters as you type. Click a row to expand
 it in place; select several with `Shift`/`Ctrl` and act on all of them at once.
+The keyboard works throughout: `↑`/`↓` walk the list, `→`/`←` open and close the
+highlighted rows, and `Esc` peels back the selection, then the search, then the
+window.
 
 <p align="center">
   <img src="docs/images/menubar.png" alt="Transfer speed in the macOS menu bar" width="220">

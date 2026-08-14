@@ -408,6 +408,41 @@ class PopupTest(unittest.TestCase):
         QTest.keyClick(popup.search, Qt.Key_Down)
         self.assertEqual(popup._selected_ids, {order[2]})
 
+    def test_right_and_left_expand_and_collapse_the_selection(self):
+        from PySide6.QtTest import QTest
+        popup, _ = self.make_popup()
+        popup.show()
+        order = popup._visual_order()
+        QTest.keyClick(popup.search, Qt.Key_Down)               # highlight the first row
+        row = popup._rows[order[0]]
+        self.assertFalse(row._expanded)
+
+        # Left/Right are sent to the search field, where focus lives. Unlike
+        # Up/Down they never bubble out of a QLineEdit — an event filter takes
+        # them before the caret does, but only while something is highlighted.
+        QTest.keyClick(popup.search, Qt.Key_Right)
+        self.assertTrue(row._expanded)
+        QTest.keyClick(popup.search, Qt.Key_Right)              # idempotent under key repeat
+        self.assertTrue(row._expanded)
+        QTest.keyClick(popup.search, Qt.Key_Left)
+        self.assertFalse(row._expanded)
+        QTest.keyClick(popup.search, Qt.Key_Left)
+        self.assertFalse(row._expanded)
+
+    def test_right_arrow_leaves_the_caret_alone_with_nothing_selected(self):
+        from PySide6.QtTest import QTest
+        popup, _ = self.make_popup()
+        popup.show()
+        popup.search.setText("iso")
+        popup.search.setCursorPosition(0)
+        popup.clear_selection()
+        # Nothing highlighted, so the arrow belongs to the field: it moves the
+        # caret instead of being swallowed. Taking it unconditionally would
+        # make the filter box uneditable.
+        QTest.keyClick(popup.search, Qt.Key_Right)
+        self.assertEqual(popup.search.cursorPosition(), 1)
+        self.assertFalse(any(r._expanded for r in popup._rows.values()))
+
     def test_arrow_keys_skip_filtered_rows(self):
         popup, _ = self.make_popup()
         popup.search.setText("iso")            # everything matches

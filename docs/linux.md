@@ -91,6 +91,11 @@ web-UI / settings buttons). `GROUP_ORDER` fixes the section order — Error,
 Downloading, Verifying, Seeding, Paused, Finished — and is the same order as the
 Swift `Torrent.grouped`.
 
+Keyboard: ↑/↓ reach `keyPressEvent` by bubbling out of the search field, which
+a single-line `QLineEdit` lets through. ←/→ (open/close the highlighted rows)
+don't — the field uses them for the caret — so they're intercepted by an event
+filter on the field, and only while something is selected.
+
 Also owns: live search filtering, keyboard navigation and range selection, the
 row context menu (`_build_context_menu`: Resume only when something selected is
 stopped and Pause only when something is running, then — on a single row —

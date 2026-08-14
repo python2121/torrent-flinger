@@ -66,8 +66,14 @@ struct TorrentRowView: View {
                     .lineLimit(1)
                 ProgressGauge(fraction: torrent.displayFraction, color: tint)
             }
-            primaryAction
-            chevron
+            // Tighter than the row's 8pt rhythm, because the chevron's target
+            // is 30 wide around a 10pt glyph: the whitespace is already inside
+            // it, and spending another 8 here would take the width out of the
+            // torrent name instead.
+            HStack(spacing: 2) {
+                primaryAction
+                chevron
+            }
         }
     }
 
@@ -144,6 +150,16 @@ struct TorrentRowView: View {
         .help(help)
     }
 
+    /// The glyph stays 10pt; the *target* around it is deliberately much
+    /// bigger. It used to be an 18pt box around that 10pt glyph — four points
+    /// of margin on a side — and a miss doesn't do nothing, it lands on the row
+    /// and *selects*, so aiming at it was fiddly in a way that read as the app
+    /// misbehaving rather than as a small button.
+    ///
+    /// Nothing is drawn here, so the target can be as generous as the layout
+    /// allows: the full row height, which the badge and text stack set anyway,
+    /// and 30 across, paid for out of the gap beside the primary action rather
+    /// than out of the torrent name.
     private var chevron: some View {
         Button {
             store.toggleExpanded(torrent.id)
@@ -151,7 +167,8 @@ struct TorrentRowView: View {
             Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(.secondary)
-                .frame(width: 18, height: 18)
+                .frame(width: 30)
+                .frame(maxHeight: .infinity)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

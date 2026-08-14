@@ -204,8 +204,13 @@ items with a POSIX file lock.
   anchor — stepping from the anchor would leave ⇧↓ stuck one row from it. The
   panel takes the arrows in `sendEvent` because the search field is first
   responder whenever it's open, and the list scrolls the landing row into view.
-  The arithmetic is the pure `Selection.apply`/`Selection.step`; `TorrentStore`
-  only maps `EventModifiers` onto it.
+  → and ← open and close every highlighted row (`Selection.expansion`),
+  idempotently, since a held arrow repeats and a toggle would flicker the row.
+  They're only claimed while something *is* highlighted: a single-line field
+  ignores ↑/↓ so those can be taken outright, but ←/→ drive the caret, and
+  taking them unconditionally would make the filter box uneditable.
+  The arithmetic is the pure `Selection.apply`/`Selection.step`/
+  `Selection.expansion`; `TorrentStore` only maps `EventModifiers` onto it.
   Selections and expansions are dropped for torrents that disappear
   server-side, and cleared when the panel closes so a reopened panel looks
   freshly opened. `Core/Selection.swift`, `TorrentStore.swift`
@@ -266,8 +271,12 @@ items with a POSIX file lock.
   (Remove when complete / Resume when paused / Pause when active — the ✕
   removes immediately, keeping the data, since it only shows on a completed
   torrent; the ellipsis entries elsewhere are the ones that confirm) and a chevron
-  that expands quick actions plus a six-field detail grid.
-  `TorrentRowView.swift`
+  that expands quick actions plus a six-field detail grid. The chevron's glyph is
+  10pt but its target is 30pt by the full row height: it was an 18pt box before,
+  and a miss doesn't do nothing — it lands on the row and *selects*, so the
+  chevron read as unreliable rather than as small. Nothing is drawn there, so
+  the target costs only the gap beside the primary action, tightened to 2pt to
+  keep it off the torrent name. `TorrentRowView.swift`
 - **Row context menu** — Resume (only when something in the selection is
   stopped), Pause (only when something in it is running), and — for a single
   row — Reveal in Finder, Torrent files (the details window opened on its Files

@@ -120,6 +120,28 @@ enum UILogicTests {
                     [99], "clicking a row that isn't in the order still selects it")
         },
 
+        TestEntry("selection/right-and-left-open-and-close-the-highlighted-rows") { t in
+            // Every highlighted row moves together, the way Pause and Remove
+            // already treat a multi-row selection as one thing.
+            var expanded = Selection.expansion([], setting: true, for: [2, 5])
+            t.equal(expanded, [2, 5])
+            t.equal(Selection.expansion(expanded, setting: false, for: [2, 5]), [],
+                    "Left closes what Right opened")
+
+            // Rows outside the selection are left exactly as they were.
+            expanded = Selection.expansion([9], setting: true, for: [2])
+            t.equal(expanded, [2, 9], "an unselected open row stays open")
+            t.equal(Selection.expansion([9], setting: false, for: [2]), [9],
+                    "…and closing something else doesn't touch it")
+
+            // Idempotent on purpose: arrow keys repeat when held, and a toggle
+            // under key repeat would flicker the row open and shut.
+            t.equal(Selection.expansion([2], setting: true, for: [2]), [2],
+                    "Right on an already-open row leaves it open")
+            t.equal(Selection.expansion([], setting: false, for: [2]), [],
+                    "Left on an already-closed row leaves it closed")
+        },
+
         TestEntry("selection/escape-peels-one-layer-per-press") { t in
             // Selection outranks the search field, so a filtered multi-select
             // takes three presses to get from "busy" to "closed".

@@ -287,6 +287,12 @@ class TorrentRow(QWidget):
         self._expand_anim.setEndValue(end)
         self._expand_anim.start()
 
+    def expand(self):
+        """Open the row if it isn't already. Idempotent, because the Right
+        arrow that calls this repeats when held."""
+        if not self._expanded:
+            self.toggle_expanded()
+
     def collapse(self):
         if self._expanded:
             self.toggle_expanded()

@@ -16,6 +16,11 @@ private final class PopoverPanel: NSPanel {
     /// set when Shift is held.
     var onMove: ((_ direction: Int, _ extend: Bool) -> Void)?
 
+    /// Invoked on Right (true) / Left (false) to open or close the highlighted
+    /// rows. Returns whether it claimed the key: with nothing highlighted it
+    /// doesn't, and the arrow goes back to the search field's caret.
+    var onExpand: ((_ expand: Bool) -> Bool)?
+
     override var canBecomeKey: Bool { true }
 
     // Arrow keys drive the list, never the search field's caret. Intercepted in
@@ -30,6 +35,16 @@ private final class PopoverPanel: NSPanel {
         if event.type == .keyDown, arrows.contains(event.keyCode),
            event.modifierFlags.intersection(claimed).isEmpty {
             onMove?(event.keyCode == 125 ? 1 : -1, event.modifierFlags.contains(.shift))
+            return
+        }
+        // Left/Right open and close the highlighted rows — but only when there
+        // are some. A single-line field ignores Up/Down, so those can be taken
+        // outright; Left/Right move the caret, so they're only borrowed when
+        // there's a selection to act on, and handed back otherwise.
+        let sides: Set<UInt16> = [123, 124]    // left, right
+        if event.type == .keyDown, sides.contains(event.keyCode),
+           event.modifierFlags.intersection(claimed).isEmpty,
+           onExpand?(event.keyCode == 124) == true {
             return
         }
         super.sendEvent(event)
@@ -305,6 +320,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // ⇧-arrow extends the range the way a ⇧-click would.
         panel.onMove = { [weak self] direction, extend in
             self?.store.moveSelection(direction, extend: extend)
+        }
+        panel.onExpand = { [weak self] expand in
+            self?.store.setExpanded(expand) ?? false
         }
     }
 

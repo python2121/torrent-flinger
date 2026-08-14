@@ -385,6 +385,22 @@ final class TorrentStore: ObservableObject {
         scrollTarget = id
     }
 
+    /// Right (`expanded` true) / Left on the keyboard: open or close every
+    /// highlighted row.
+    ///
+    /// Returns whether the key was claimed. With nothing highlighted it isn't,
+    /// and the caller lets the arrow go back to the search field — unlike Up
+    /// and Down, which a single-line field ignores, Left and Right are the
+    /// caret's, and taking them unconditionally would make the filter box
+    /// uneditable.
+    @discardableResult
+    func setExpanded(_ expanded: Bool) -> Bool {
+        let targets = Set(selectedInVisualOrder)
+        guard !targets.isEmpty else { return false }
+        expandedIDs = Selection.expansion(expandedIDs, setting: expanded, for: targets)
+        return true
+    }
+
     /// Consumed by the list once it has scrolled the row into view.
     func clearScrollTarget() { scrollTarget = nil }
 

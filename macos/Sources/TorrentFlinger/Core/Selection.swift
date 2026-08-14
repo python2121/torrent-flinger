@@ -83,4 +83,16 @@ enum Selection {
         guard let index else { return direction > 0 ? order.first : order.last }
         return order[min(max(index + direction, 0), order.count - 1)]
     }
+
+    /// What Right (`expanded` true) or Left does to the expanded set: every
+    /// highlighted row moves together, the way Pause and Remove already treat a
+    /// multi-row selection as one thing.
+    ///
+    /// Deliberately idempotent — Right on an already-open row leaves it open
+    /// rather than toggling. Arrow keys get held down and repeated, and a
+    /// toggle under key repeat flickers the row open and shut.
+    static func expansion(_ current: Set<Int>, setting expanded: Bool,
+                          for ids: Set<Int>) -> Set<Int> {
+        expanded ? current.union(ids) : current.subtracting(ids)
+    }
 }

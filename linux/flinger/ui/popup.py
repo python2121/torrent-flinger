@@ -199,6 +199,10 @@ class Popup(QWidget):
         self.setFixedSize(self._grid * 24, self._grid * 31)
         self._apply_theme()
         QShortcut(QKeySequence.Find, self, activated=self.search.setFocus)
+        # Left/Right have to be taken before the field editor uses them to move
+        # the caret, which means an event filter — unlike Up/Down, which a
+        # single-line QLineEdit ignores and lets bubble up to keyPressEvent.
+        self.search.installEventFilter(self)
 
         # Focus loss is the primary outside-click signal…
         QGuiApplication.instance().focusWindowChanged.connect(self._on_focus_window_changed)
@@ -429,6 +433,24 @@ class Popup(QWidget):
     def selected_ids(self) -> list[int]:
         return [tid for tid in self._visual_order() if tid in self._selected_ids]
 
+    def set_expanded(self, expand: bool) -> bool:
+        """Open (Right) or close (Left) every highlighted row.
+
+        Returns whether there was anything to act on: with nothing selected the
+        caller hands the arrow back to the search field, whose caret it
+        normally drives. Every selected row moves together, the way Pause and
+        Remove already treat a multi-row selection as one thing.
+        """
+        ids = self.selected_ids()
+        if not ids:
+            return False
+        for tid in ids:
+            row = self._rows.get(tid)
+            if row is None:
+                continue
+            row.expand() if expand else row.collapse()
+        return True
+
     def clear_selection(self) -> None:
         """Drop the selection along with the anchor and cursor that go with it,
         so the next arrow key starts from the top (Down) or bottom (Up) again."""
@@ -616,6 +638,21 @@ class Popup(QWidget):
             self.windowHandle().requestActivate()  # focus-loss = our outside-click signal
         self.search.setFocus()
 
+    def eventFilter(self, obj, event):
+        """Claim Left/Right from the search field while rows are highlighted.
+
+        Only while highlighted: with nothing selected the arrows stay the
+        caret's, or typing a filter would become unnavigable. Escape clears the
+        selection, so there's always a way back to editing.
+        """
+        if (obj is self.search and event.type() == QEvent.KeyPress
+                and event.key() in (Qt.Key_Left, Qt.Key_Right)
+                and not (event.modifiers() & (Qt.ControlModifier | Qt.AltModifier
+                                              | Qt.MetaModifier))):
+            if self.set_expanded(event.key() == Qt.Key_Right):
+                return True
+        return super().eventFilter(obj, event)
+
     def keyPressEvent(self, event):
         # Up/Down reach us because a single-line QLineEdit ignores them, so
         # they bubble out of the search field — the same route Escape takes.
@@ -625,6 +662,11 @@ class Popup(QWidget):
             self.step_selection(1 if event.key() == Qt.Key_Down else -1,
                                 extend=bool(event.modifiers() & Qt.ShiftModifier))
             return
+        if event.key() in (Qt.Key_Left, Qt.Key_Right) and not (
+                event.modifiers() & (Qt.ControlModifier | Qt.AltModifier
+                                     | Qt.MetaModifier)):
+            if self.set_expanded(event.key() == Qt.Key_Right):
+                return
         if event.key() == Qt.Key_Escape:
             # Escape peels back one layer of transient state per press:
             # selection first (the lightest, most recently made), then the
