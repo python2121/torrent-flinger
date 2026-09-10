@@ -52,13 +52,8 @@ final class AddTorrentViewModel: ObservableObject {
         self.choices = store.config.customDirs
         self.paused = store.config.startPaused
 
-        // Remember where the last torrent went…
-        let remembered = store.config.lastDownloadDir
-        if !remembered.isEmpty, choices.contains(where: { $0.dir == remembered }) {
-            selectedDir = remembered
-        }
-        // …but a TV-looking name overrides it with the folder flagged as the
-        // final TV location.
+        // Always start on the server default; only a TV-looking name moves the
+        // selection, to the folder flagged as the final TV location.
         let (isTV, reason) = TVDetect.looksLikeTV(torrentName)
         if isTV, let tvDir = TVDetect.findTVDir(choices), choices.contains(where: { $0.dir == tvDir }) {
             selectedDir = tvDir
@@ -85,9 +80,7 @@ final class AddTorrentViewModel: ObservableObject {
     }
 
     func save() {
-        let directory = selectedDir
-        store.updateConfig { $0.lastDownloadDir = directory ?? "" }
-        store.add(link: link, downloadDir: directory, paused: paused)
+        store.add(link: link, downloadDir: selectedDir, paused: paused)
         onFinish()
     }
 

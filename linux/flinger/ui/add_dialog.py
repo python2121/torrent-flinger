@@ -28,7 +28,8 @@ class AddDialog(QDialog):
         name = QLabel(f"<b>{torrent_name}</b>")
         name.setWordWrap(True)
 
-        # Default directory, then the custom dirs (managed in Options)
+        # Default directory, then the custom dirs (managed in Options). The
+        # server default is always preselected; only a TV match (below) moves it.
         self.location = QComboBox()
         self.location.addItem("< Default Directory >", None)
         for entry in config.custom_dirs:
@@ -36,10 +37,6 @@ class AddDialog(QDialog):
             self.location.addItem(f"{label} ({entry.get('dir', '')})", entry.get("dir"))
         self.location.currentIndexChanged.connect(lambda _i: self._update_free_space())
         self._server_default_raw = ""
-        if config.last_download_dir:
-            index = self.location.findData(config.last_download_dir)
-            if index >= 1:
-                self.location.setCurrentIndex(index)
 
         self.free_label = QLabel("")
         self.free_label.setFont(small_font())
@@ -100,8 +97,4 @@ class AddDialog(QDialog):
 
     def result_options(self) -> tuple[str | None, bool]:
         """(download_dir or None for server default, paused)."""
-        directory = self.location.currentData()
-        if (directory or "") != self.config.last_download_dir:
-            self.config.last_download_dir = directory or ""
-            self.config.save()
-        return directory, self.paused.isChecked()
+        return self.location.currentData(), self.paused.isChecked()

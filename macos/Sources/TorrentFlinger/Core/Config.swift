@@ -84,6 +84,8 @@ struct Config: Codable, Equatable {
     var startPaused: Bool = false
     var showAddDialog: Bool = true
     var customDirs: [CustomDir] = []
+    /// Vestigial: the add dialog no longer preselects the last-used folder.
+    /// Still decoded and written so the shared `config.json` round-trips.
     var lastDownloadDir: String = ""
 
     /// Remote→local path mapping for "Reveal in Finder": where the server's

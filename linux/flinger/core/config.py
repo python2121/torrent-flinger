@@ -52,6 +52,9 @@ class Config:
     show_add_dialog: bool = True
     # [{"label": "TV", "dir": "/data/tv"}, ...]
     custom_dirs: list = field(default_factory=list)
+    # Vestigial: the add dialog no longer preselects the last-used folder
+    # (it always starts on the server default). Kept so older config files
+    # still load unchanged.
     last_download_dir: str = ""
     # remote→local path mapping for "Reveal in Dolphin": where the server's
     # download share is mounted locally. Empty mount_remote = use the server's

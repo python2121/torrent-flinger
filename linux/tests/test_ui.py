@@ -599,9 +599,9 @@ class DetailsDialogTest(unittest.TestCase):
         dialog = AddDialog(cfg, "The.Bear.S03E05.1080p.WEB.h264")
         self.assertEqual(dialog.location.currentData(), "/downloads/tv")
         self.assertFalse(dialog.tv_hint.isHidden())
-        # movie name → last-used behavior unchanged, no hint
+        # movie name → server default, no hint (last-used folder is ignored)
         dialog = AddDialog(cfg, "Oppenheimer.2023.1080p.BluRay")
-        self.assertEqual(dialog.location.currentData(), "/downloads/movies")
+        self.assertIsNone(dialog.location.currentData())
         self.assertTrue(dialog.tv_hint.isHidden())
         # TV name but no dir flagged → default, no hint (labels don't count)
         cfg2 = Config(custom_dirs=[{"label": "tv", "dir": "/downloads/tv"}])
@@ -626,14 +626,18 @@ class DetailsDialogTest(unittest.TestCase):
                          [{"label": "tv", "dir": "/d/tv"},
                           {"label": "books", "dir": "/d/books", "tv": True}])
 
-    def test_add_dialog_preselects_last_dir(self):
+    def test_add_dialog_ignores_last_dir(self):
         from flinger.core.config import Config
         from flinger.ui.add_dialog import AddDialog
         cfg = Config(custom_dirs=[{"label": "TV", "dir": "/data/tv"},
                                   {"label": "Books", "dir": "/data/books"}],
                      last_download_dir="/data/books")
         dialog = AddDialog(cfg, "Some.Torrent")
-        self.assertEqual(dialog.location.currentData(), "/data/books")
+        self.assertIsNone(dialog.location.currentData())
+        # picking a folder doesn't write it back as a new default
+        dialog.location.setCurrentIndex(1)
+        dialog.result_options()
+        self.assertEqual(cfg.last_download_dir, "/data/books")
 
 
 class AppIntegrationTest(unittest.TestCase):
