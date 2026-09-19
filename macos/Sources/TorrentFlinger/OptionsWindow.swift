@@ -534,9 +534,9 @@ struct AddDirectorySheet: View {
     var onSave: (String, String, Bool) -> Void
     @Environment(\.dismiss) private var dismiss
 
-    @State private var label = ""
-    @State private var dir = ""
-    @State private var tv = false
+    @ViewState private var label = ""
+    @ViewState private var dir = ""
+    @ViewState private var tv = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {

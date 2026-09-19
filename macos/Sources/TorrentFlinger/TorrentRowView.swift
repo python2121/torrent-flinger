@@ -11,7 +11,7 @@ struct TorrentRowView: View {
     let torrent: Torrent
     var actions = PopoverActions()
 
-    @State private var hovering = false
+    @ViewState private var hovering = false
 
     private var isSelected: Bool { store.selectedIDs.contains(torrent.id) }
     private var isExpanded: Bool { store.expandedIDs.contains(torrent.id) }

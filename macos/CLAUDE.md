@@ -163,6 +163,17 @@ break the other target.
 
 ## Things to know before editing
 
+- **Never use `@State`; use `@ViewState`** (`ViewState.swift`). Since the
+  macOS 27 SDK, `@State` is a macro backed by `libSwiftUIMacros.dylib`, which
+  ships only inside Xcode — this machine has Command Line Tools only, so
+  `@State` fails with "plugin for module 'SwiftUIMacros' not found" plus a
+  cascade of "'self' is immutable" errors. `@ViewState` wraps the still-present
+  `State<Value>` struct and behaves like the classic property wrapper
+  (`$binding` works). `build-app.sh` rejects any `@State` in `Sources/`.
+  `@Binding`, `@ObservedObject`, `@StateObject`, `@Environment`, and friends
+  are still plain wrappers and fine. Also `import Combine` explicitly in files
+  using `Timer.publish`/`onReceive` — Swift 6.4 warns when it's only reached
+  through SwiftUI.
 - **The Local Network permission is load-bearing — don't remove any of the
   three pieces.** macOS gates connections to LAN addresses, and a Transmission
   server is essentially always on the LAN. Getting this wrong costs an evening,
