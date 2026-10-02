@@ -16,7 +16,7 @@ The second purpose is link handling: register as the system's `magnet:` and
 `.torrent` handler so a click in any browser reaches the server, without a
 browser extension.
 
-## Two apps, one server
+## Three apps, one server
 
 ```
                      ┌──────────────────────────────┐
@@ -24,28 +24,33 @@ browser extension.
                      │  (NAS / server / seedbox)    │
                      └──────────────┬───────────────┘
                                     │ JSON-RPC over HTTP
-                    ┌───────────────┴────────────────┐
-                    │                                │
-        ┌───────────┴────────────┐      ┌────────────┴───────────┐
-        │  linux/    (Linux)     │      │  macos/   (macOS)      │
-        │  Python 3 + PySide6    │      │  Swift + SwiftUI       │
-        │  system tray + popup   │      │  menu bar + panel      │
-        └───────────┬────────────┘      └────────────┬───────────┘
-                    │                                │
-                    └──────────────┬─────────────────┘
-                                   │
-                    ~/.config/torrent-flinger/config.json      (Linux)
-                    ~/Library/Application Support/…/config.json (macOS)
+            ┌───────────────────────┼───────────────────────┐
+            │                       │                       │
+┌───────────┴────────────┐ ┌────────┴───────────┐ ┌─────────┴──────────────┐
+│  linux/    (Linux)     │ │  macos/   (macOS)  │ │  ios/   (iPhone)       │
+│  Python 3 + PySide6    │ │  Swift + SwiftUI   │ │  Swift + SwiftUI       │
+│  system tray + popup   │ │  menu bar + panel  │ │  one list + sheets     │
+└───────────┬────────────┘ └────────┬───────────┘ └─────────┬──────────────┘
+            │                       │                       │
+            │                       └── TorrentFlingerCore ─┘
+            │                           (one Swift library, built from macos/)
+            │
+   ~/.config/torrent-flinger/config.json      (Linux)
+   ~/Library/Application Support/…/config.json (macOS; same keys on the phone)
 ```
 
 Same feature set, same server, same config file. Different shells, because a
-Qt app on macOS is a bad macOS app and a SwiftUI app on Linux doesn't exist.
+Qt app on macOS is a bad macOS app, a SwiftUI app on Linux doesn't exist, and
+a menu bar doesn't exist on a phone.
 
 ## The one decision worth defending: ported, not shared
 
-`linux/flinger/core/` (Python) and `macos/Sources/TorrentFlinger/Core/` (Swift) are
+`linux/flinger/core/` (Python) and `macos/Sources/TorrentFlingerCore/` (Swift) are
 the same five modules — RPC client, config, formatting, TV detection, tray icon
-selection — implemented twice, deliberately.
+selection — implemented twice, deliberately. (The two *Swift* apps do share
+that code: `TorrentFlingerCore` is a library target in the `macos/` package,
+and the iPhone app in `ios/` links it as a local package. Swift-to-Swift
+sharing costs nothing; it's the Python-to-Swift bridge that was declined.)
 
 The alternative was one implementation with a bridge: PythonKit, or a C
 library, or a local service both talk to. Each buys shared logic at the cost of
@@ -74,20 +79,23 @@ monochrome set, two consumers.
 
 Both apps have the same four layers; only the names differ.
 
-| Layer | Linux | macOS |
-|---|---|---|
-| Transport | `linux/flinger/core/transmission.py` (`urllib`, blocking) | `Core/TransmissionClient.swift` (`URLSession`, `actor`) |
-| Off-thread | `linux/flinger/ui/worker.py` (`QThreadPool`) | `async`/`await` |
-| State hub | `linux/flinger/ui/app.py` (`FlingerApp`) | `TorrentStore.swift` (`@MainActor`, `ObservableObject`) |
-| Views | `popup.py`, `torrent_row.py`, dialogs | `PopoverView`, `TorrentRowView`, windows |
+| Layer | Linux | macOS | iPhone |
+|---|---|---|---|
+| Transport | `linux/flinger/core/transmission.py` (`urllib`, blocking) | `TorrentFlingerCore/TransmissionClient.swift` (`URLSession`, `actor`) | same library |
+| Off-thread | `linux/flinger/ui/worker.py` (`QThreadPool`) | `async`/`await` | `async`/`await` |
+| State hub | `linux/flinger/ui/app.py` (`FlingerApp`) | `TorrentStore.swift` (`@MainActor`, `ObservableObject`) | `PhoneStore.swift` (`@MainActor`, `@Observable`) |
+| Views | `popup.py`, `torrent_row.py`, dialogs | `PopoverView`, `TorrentRowView`, windows | `TorrentListView`, `TorrentDetailView`, sheets |
 
 The hub owns the poll timer, the config, the client, and every mutating action.
 Views raise intent (a signal on Linux, a method call on macOS); the hub performs
 the RPC off the main thread and re-polls on success, so the UI only ever renders
 server truth rather than optimistically guessing.
 
-**Polling cadence** is the same on both: the configured interval (default 3 s)
-while the panel is open, 30 s while it's closed. The macOS build adds a third
+**Polling cadence** is the same on both desktops: the configured interval
+(default 3 s) while the panel is open, 30 s while it's closed. The phone polls
+at the configured interval while it's in the foreground and not at all
+otherwise — iOS gives a backgrounded app no schedule worth relying on, which is
+also why the phone has no "download complete" notification. The macOS build adds a third
 timer — `session-stats` alone every 2.5 s while a transfer is running and the
 panel is closed — to feed the menu bar's moving average. See
 [macos.md](macos.md#speed-smoothing).
@@ -104,6 +112,8 @@ Not stylistic differences — places where the platform forced a different desig
 | Display server | Forced onto XWayland (`QT_QPA_PLATFORM=xcb;wayland`) because Wayland toplevels can't position themselves and never get activation | n/a |
 | Theming | Qt palette-derived stylesheet, re-tinted per poll so a Breeze light/dark switch is picked up | AppKit template images and semantic colours adapt on their own |
 | Network permission | none | Local Network grant is load-bearing and non-obvious — see [`macos/CLAUDE.md`](../macos/CLAUDE.md) |
+
+The phone differs again, in the ways a phone forces; see [ios.md](ios.md).
 
 ## Failure model
 

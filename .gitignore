@@ -14,3 +14,11 @@ macos/.env
 
 # Editor-local settings
 .vscode/
+
+# iOS build (ios/). The hand-written Xcode project is checked in; per-user
+# state and Xcode's package-resolution cache are not.
+ios/**/xcuserdata/
+ios/TorrentFlingerPhone.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+ios/build/
+ios/DerivedData/
+*.xcuserstate

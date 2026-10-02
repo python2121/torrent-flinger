@@ -5,7 +5,9 @@ in any browser and it goes straight to your NAS — no browser extension, no web
 UI, no ssh.
 
 Native apps for **macOS** and **Linux**, talking to the same server and sharing
-the same config file.
+the same config file — plus an **iPhone** app that shares the Mac app's
+Transmission client, so a magnet link tapped in Safari on the phone lands on
+the server too.
 
 <p align="center">
   <img src="docs/images/popover.png" alt="The torrent list, grouped by status" width="380">
@@ -140,15 +142,42 @@ Connection**.
 The popup is styled after KDE Plasma's own applets and takes all its colours
 from the system palette, so Breeze light and dark both look right.
 
-### Using both
+### iPhone
 
-The two builds read and write the same `config.json` with the same keys, so a
-server you set up on one is a copy-paste away on the other:
+A personal build, installed from Xcode — not on the App Store. Needs full
+Xcode (the iOS SDK) and a free Apple developer team.
+
+```bash
+cd torrent-flinger/ios
+./build.sh                           # simulator build, no signing
+open TorrentFlingerPhone.xcodeproj   # pick your team under Signing, then Run on your phone
+```
+
+Then enter the server on the first-run screen, or **Import config.json** to
+load the Mac's file (AirDrop it to the phone first). Over Tailscale the host is
+simply the server's tailnet name, so the app works away from home as well.
+
+What you get: the same grouped torrent list with search, swipe to pause,
+resume or remove, multi-select for batch actions, the full per-torrent
+Details screen (Info, Files tree with per-folder checkboxes and priorities,
+Peers, Trackers, Options), the add sheet with destination picker, free space
+and TV detection, server speed limits and turtle mode, and session statistics.
+Tapping a `magnet:` link in Safari — or sharing a `.torrent` file to the app —
+opens the add sheet. What you don't get: anything that needs the app running in
+the background (the menu-bar speed readout, "download complete" notifications);
+the list refreshes while the app is open. More in [`docs/ios.md`](docs/ios.md).
+
+### Using more than one
+
+The desktop builds read and write the same `config.json` with the same keys, so
+a server you set up on one is a copy-paste away on the other, and the phone
+imports the same file:
 
 | Platform | Path |
 |---|---|
 | macOS | `~/Library/Application Support/torrent-flinger/config.json` |
 | Linux | `~/.config/torrent-flinger/config.json` |
+| iPhone | the same file, imported from Settings; the password moves to the Keychain |
 
 ---
 
@@ -162,8 +191,9 @@ that's what a NAS actually serves.
 
 ## Contributing / hacking
 
-The two apps are independent — nothing in `macos/` can break `linux/flinger/` or the
-other way round — and both are documented for people arriving cold:
+The desktop apps are independent — nothing in `macos/` can break `linux/flinger/`
+or the other way round — and the iPhone app shares only the Mac app's
+`TorrentFlingerCore` library. All three are documented for people arriving cold:
 
 - [`docs/`](docs/) — architecture, the RPC layer and its quirks, config keys,
   a file-by-file catalogue of both builds, and how the tests work
@@ -171,10 +201,13 @@ other way round — and both are documented for people arriving cold:
   gotchas that cost real time
 - [`macos/FEATURE_MAP.md`](macos/FEATURE_MAP.md) — every macOS feature and where
   it lives
+- [`ios/CLAUDE.md`](ios/CLAUDE.md) and [`docs/ios.md`](docs/ios.md) — the iPhone
+  build's commands, what ported and what didn't
 
 ```bash
 cd linux && PYTHONPATH=. .venv/bin/python -m unittest discover tests   # Linux suite
 cd macos && ./test.sh                                                  # macOS suite
+cd ios && ./build.sh                                                   # iPhone compiles
 ```
 
 The screenshots above are generated against an invented server

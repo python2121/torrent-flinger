@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Compile the iPhone app for the simulator — the "does it still build" check,
+# run before pushing anything that touches macos/Sources/TorrentFlingerCore.
+# Needs full Xcode (the iOS SDK); the Command Line Tools alone can't do it.
+#
+#   ./build.sh            # build
+#   ./build.sh run        # build, then install + launch on the booted simulator
+#   ./build.sh run detail:files   # …opening a debug screen (see CLAUDE.md)
+set -euo pipefail
+cd "$(dirname "$0")"
+
+APP=build/Build/Products/Debug-iphonesimulator/TorrentFlingerPhone.app
+BUNDLE=com.python21.TorrentFlingerPhone
+
+xcodebuild -project TorrentFlingerPhone.xcodeproj -scheme TorrentFlingerPhone \
+  -destination 'generic/platform=iOS Simulator' -derivedDataPath build \
+  CODE_SIGNING_ALLOWED=NO build 2>&1 \
+  | grep -E 'error:|warning: .*\.swift|BUILD (SUCCEEDED|FAILED)' | grep -v '^\s*|' || true
+test -d "$APP" || { echo "error: no app at $APP" >&2; exit 1; }
+
+if [[ "${1:-}" == "run" ]]; then
+  xcrun simctl bootstatus booted -b >/dev/null 2>&1 || xcrun simctl boot "iPhone 17"
+  xcrun simctl install booted "$APP"
+  xcrun simctl terminate booted "$BUNDLE" 2>/dev/null || true
+  if [[ -n "${2:-}" ]]; then
+    xcrun simctl launch booted "$BUNDLE" -debugScreen "$2"
+  else
+    xcrun simctl launch booted "$BUNDLE"
+  fi
+fi
