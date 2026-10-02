@@ -3,10 +3,10 @@ import Foundation
 /// List-selection arithmetic, kept pure and AppKit-free so the fiddly parts
 /// (shift-ranges across a re-ordered list, an anchor pointing at a row that has
 /// since disappeared) can be tested directly.
-enum Selection {
+public enum Selection: Sendable {
     /// What the click meant. `TorrentStore` maps SwiftUI's `EventModifiers`
     /// onto this so the rules don't depend on the UI framework.
-    enum Gesture {
+    public enum Gesture: Sendable {
         /// Plain click — replaces the selection.
         case replace
         /// Shift-click — selects the range from the anchor to here.
@@ -21,7 +21,7 @@ enum Selection {
     /// is what a shift-range must walk — grouping means it differs from the
     /// server's order. An `extend` with no usable anchor degrades to a plain
     /// click rather than selecting nothing.
-    static func apply(
+    public static func apply(
         _ gesture: Gesture,
         to id: Int,
         current: Set<Int>,
@@ -51,7 +51,7 @@ enum Selection {
     }
 
     /// What one Escape press should do.
-    enum EscapeStep {
+    public enum EscapeStep: Sendable {
         case clearSelection
         case clearSearch
         case close
@@ -60,7 +60,7 @@ enum Selection {
     /// Escape peels back one layer of transient state per press: selection
     /// first (the lightest, most recently made), then the search filter, and
     /// only then the panel itself. Same order as the Linux popup.
-    static func escape(hasSelection: Bool, hasSearch: Bool) -> EscapeStep {
+    public static func escape(hasSelection: Bool, hasSearch: Bool) -> EscapeStep {
         if hasSelection { return .clearSelection }
         if hasSearch { return .clearSearch }
         return .close
@@ -76,7 +76,7 @@ enum Selection {
     /// the last still-visible selected row; with nothing selected at all, Down
     /// starts at the top and Up at the bottom. Movement stops at the ends
     /// rather than wrapping.
-    static func step(_ direction: Int, current: Set<Int>, cursor: Int?, order: [Int]) -> Int? {
+    public static func step(_ direction: Int, current: Set<Int>, cursor: Int?, order: [Int]) -> Int? {
         guard !order.isEmpty else { return nil }
         let index: Int? = cursor.flatMap { order.firstIndex(of: $0) }
             ?? order.lastIndex(where: { current.contains($0) })
@@ -91,7 +91,7 @@ enum Selection {
     /// Deliberately idempotent — Right on an already-open row leaves it open
     /// rather than toggling. Arrow keys get held down and repeated, and a
     /// toggle under key repeat flickers the row open and shut.
-    static func expansion(_ current: Set<Int>, setting expanded: Bool,
+    public static func expansion(_ current: Set<Int>, setting expanded: Bool,
                           for ids: Set<Int>) -> Set<Int> {
         expanded ? current.union(ids) : current.subtracting(ids)
     }

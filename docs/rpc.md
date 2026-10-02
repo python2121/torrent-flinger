@@ -3,7 +3,7 @@
 Two implementations of the same client:
 
 - `linux/flinger/core/transmission.py` — `urllib`, blocking, called from a Qt thread pool
-- `macos/Sources/TorrentFlinger/Core/TransmissionClient.swift` — `URLSession`,
+- `macos/Sources/TorrentFlingerCore/TransmissionClient.swift` — `URLSession`,
   `async`/`await`, an `actor` because the session id is mutable state shared
   across concurrent calls
 

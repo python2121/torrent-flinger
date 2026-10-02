@@ -1,6 +1,7 @@
 #if os(macOS)
 import AppKit
 import SwiftUI
+import TorrentFlingerCore
 
 /// A titled, ordinary `NSWindow` hosting a SwiftUI view — the Options, Stats,
 /// Details and Add windows all sit in one of these rather than in the

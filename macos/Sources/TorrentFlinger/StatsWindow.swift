@@ -1,6 +1,7 @@
 #if os(macOS)
 import AppKit
 import SwiftUI
+import TorrentFlingerCore
 
 /// Session statistics: this session vs. cumulative totals — a port of
 /// `linux/flinger/ui/stats_dialog.py`.

@@ -1,5 +1,6 @@
 #if DEBUG
 import Foundation
+@testable import TorrentFlingerCore
 
 /// A Transmission server made of invented data, so the debug windows can be
 /// screenshotted without publishing anything real.

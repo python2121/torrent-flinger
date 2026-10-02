@@ -3,6 +3,7 @@ import AppKit
 import Combine
 import SwiftUI
 import UniformTypeIdentifiers
+import TorrentFlingerCore
 
 /// Borderless panel that can still become key, so the SwiftUI controls inside
 /// (search field, buttons) receive clicks and keystrokes without activating the

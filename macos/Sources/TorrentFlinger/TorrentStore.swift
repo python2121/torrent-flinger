@@ -2,6 +2,7 @@
 import AppKit
 import Foundation
 import SwiftUI
+import TorrentFlingerCore
 
 /// The single source of truth: server state, polling cadence, selection, and
 /// every mutating action. The macOS counterpart of `linux/flinger/ui/app.py`'s

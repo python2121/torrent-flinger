@@ -4,7 +4,7 @@ import Foundation
 /// objects are free-form passthroughs (`torrent-set`, `session-set`). Response
 /// bodies decode into concrete `Codable` types instead — this exists so the
 /// request side doesn't need a struct per call site.
-enum JSONValue: Codable, Equatable {
+public enum JSONValue: Codable, Equatable, Sendable {
     case string(String)
     case int(Int)
     case double(Double)
@@ -13,7 +13,7 @@ enum JSONValue: Codable, Equatable {
     case object([String: JSONValue])
     case null
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let c = try decoder.singleValueContainer()
         if c.decodeNil() { self = .null; return }
         if let v = try? c.decode(Bool.self) { self = .bool(v); return }
@@ -25,7 +25,7 @@ enum JSONValue: Codable, Equatable {
         throw DecodingError.dataCorruptedError(in: c, debugDescription: "unsupported JSON value")
     }
 
-    func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: Encoder) throws {
         var c = encoder.singleValueContainer()
         switch self {
         case .string(let v): try c.encode(v)
@@ -46,18 +46,18 @@ extension JSONValue: ExpressibleByStringLiteral,
                      ExpressibleByArrayLiteral,
                      ExpressibleByDictionaryLiteral,
                      ExpressibleByNilLiteral {
-    init(stringLiteral value: String) { self = .string(value) }
-    init(integerLiteral value: Int) { self = .int(value) }
-    init(floatLiteral value: Double) { self = .double(value) }
-    init(booleanLiteral value: Bool) { self = .bool(value) }
-    init(arrayLiteral elements: JSONValue...) { self = .array(elements) }
-    init(dictionaryLiteral elements: (String, JSONValue)...) {
+    public init(stringLiteral value: String) { self = .string(value) }
+    public init(integerLiteral value: Int) { self = .int(value) }
+    public init(floatLiteral value: Double) { self = .double(value) }
+    public init(booleanLiteral value: Bool) { self = .bool(value) }
+    public init(arrayLiteral elements: JSONValue...) { self = .array(elements) }
+    public init(dictionaryLiteral elements: (String, JSONValue)...) {
         self = .object(Dictionary(uniqueKeysWithValues: elements))
     }
-    init(nilLiteral: ()) { self = .null }
+    public init(nilLiteral: ()) { self = .null }
 }
 
-extension JSONValue {
+public extension JSONValue {
     static func ints(_ values: [Int]) -> JSONValue { .array(values.map { .int($0) }) }
     static func strings(_ values: [String]) -> JSONValue { .array(values.map { .string($0) }) }
 

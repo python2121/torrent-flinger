@@ -11,8 +11,8 @@ import Foundation
 /// Real-world TV releases essentially always carry one of these markers, so no
 /// title list is needed. Movies default elsewhere, so a missed detection just
 /// means picking the folder manually — same as having no detection.
-enum TVDetect {
-    enum Reason: String {
+public enum TVDetect: Sendable {
+    public enum Reason: String, Sendable {
         case episode
         case airDate = "air-date"
         case season
@@ -29,7 +29,7 @@ enum TVDetect {
     )
 
     /// `(isTV, reason)` — reason is nil when it isn't TV.
-    static func looksLikeTV(_ name: String) -> (isTV: Bool, reason: Reason?) {
+    public static func looksLikeTV(_ name: String) -> (isTV: Bool, reason: Reason?) {
         if matches(episode, name) { return (true, .episode) }
         if matches(airDate, name) { return (true, .airDate) }
         if matches(seasonPack, name) { return (true, .season) }
@@ -38,7 +38,7 @@ enum TVDetect {
 
     /// The custom dir flagged as the final TV location, or nil. At most one
     /// entry carries the flag (enforced by the options UI).
-    static func findTVDir(_ customDirs: [CustomDir]) -> String? {
+    public static func findTVDir(_ customDirs: [CustomDir]) -> String? {
         customDirs.first(where: { $0.tv })?.dir
     }
 

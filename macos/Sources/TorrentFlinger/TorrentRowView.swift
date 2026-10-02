@@ -1,6 +1,7 @@
 #if os(macOS)
 import AppKit
 import SwiftUI
+import TorrentFlingerCore
 
 /// One torrent in the popover list — a port of `linux/flinger/ui/torrent_row.py`'s
 /// `ExpandableListItem`: a compact header (state badge, name, `↓/↑ speed · % ·

@@ -1,6 +1,7 @@
 #if os(macOS)
 import AppKit
 import SwiftUI
+import TorrentFlingerCore
 
 /// "Save in folder" dialog shown when a magnet or `.torrent` arrives — a port
 /// of `linux/flinger/ui/add_dialog.py`. One window per incoming link, so a batch of

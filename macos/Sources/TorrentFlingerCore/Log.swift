@@ -10,15 +10,15 @@ import os
 /// permission. Failures go in at `.error` so they persist in the log store:
 ///
 ///     log show --last 10m --predicate 'subsystem == "io.github.python2121.TorrentFlinger"'
-enum Log {
+public enum Log: Sendable {
     private static let logger = Logger(subsystem: "io.github.python2121.TorrentFlinger",
                                        category: "app")
 
-    static func error(_ message: String) {
+    public static func error(_ message: String) {
         logger.error("\(message, privacy: .public)")
     }
 
-    static func info(_ message: String) {
+    public static func info(_ message: String) {
         logger.notice("\(message, privacy: .public)")
     }
 }

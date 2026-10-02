@@ -1,6 +1,7 @@
 #if os(macOS)
 import AppKit
 import SwiftUI
+import TorrentFlingerCore
 
 /// Per-torrent administration window: Info / Files / Peers / Trackers /
 /// Options — a port of `linux/flinger/ui/details_dialog.py`, whose feature set

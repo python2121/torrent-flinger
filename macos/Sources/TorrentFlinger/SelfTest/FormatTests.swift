@@ -1,5 +1,6 @@
 #if DEBUG
 import Foundation
+@testable import TorrentFlingerCore
 
 /// Formatting, path mapping and TV detection — kept assertion-for-assertion in
 /// step with the Python suite (`tests/test_core.py`), so the Linux and macOS

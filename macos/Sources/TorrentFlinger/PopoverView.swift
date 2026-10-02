@@ -1,6 +1,7 @@
 #if os(macOS)
 import AppKit
 import SwiftUI
+import TorrentFlingerCore
 
 /// Everything the popover needs from the app shell (windows, file pickers).
 /// Passing them in as closures keeps the view free of `AppDelegate`.

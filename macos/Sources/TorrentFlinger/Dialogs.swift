@@ -1,5 +1,6 @@
 #if os(macOS)
 import AppKit
+import TorrentFlingerCore
 
 /// The handful of modal confirmations the app needs, as `NSAlert`s so they
 /// look native and work from an accessory app (which has no key window of its

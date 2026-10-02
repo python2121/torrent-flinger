@@ -1,14 +1,14 @@
 import Foundation
 
 // torrent-get "status" values, per the RPC spec.
-enum TorrentStatus {
-    static let stopped = 0
-    static let checkWait = 1
-    static let checking = 2
-    static let downloadWait = 3
-    static let downloading = 4
-    static let seedWait = 5
-    static let seeding = 6
+public enum TorrentStatus: Sendable {
+    public static let stopped = 0
+    public static let checkWait = 1
+    public static let checking = 2
+    public static let downloadWait = 3
+    public static let downloading = 4
+    public static let seedWait = 5
+    public static let seeding = 6
 }
 
 /// One torrent as `torrent-get` returns it.
@@ -17,59 +17,59 @@ enum TorrentStatus {
 /// requested by `Transmission.detailFields` stay nil after a list poll. Every
 /// property decodes leniently (missing → default), because Transmission 3.x,
 /// 4.x and the various reimplementations disagree about which keys they emit.
-struct Torrent: Codable, Identifiable, Equatable {
-    var id: Int = 0
-    var name: String = ""
-    var status: Int = 0
-    var percentDone: Double = 0
-    var metadataPercentComplete: Double = 1
-    var rateDownload: Int = 0
-    var rateUpload: Int = 0
-    var totalSize: Int64 = 0
-    var downloadedEver: Int64 = 0
-    var uploadedEver: Int64 = 0
-    var uploadRatio: Double = 0
-    var eta: Int = -1
-    var peersConnected: Int = 0
-    var peersSendingToUs: Int = 0
-    var peersGettingFromUs: Int = 0
-    var isFinished: Bool = false
-    var error: Int = 0
-    var errorString: String = ""
-    var addedDate: Int = 0
-    var queuePosition: Int = 0
-    var sizeWhenDone: Int64 = 0
-    var leftUntilDone: Int64 = 0
-    var magnetLink: String = ""
-    var downloadDir: String = ""
+public struct Torrent: Codable, Identifiable, Equatable, Sendable {
+    public var id: Int = 0
+    public var name: String = ""
+    public var status: Int = 0
+    public var percentDone: Double = 0
+    public var metadataPercentComplete: Double = 1
+    public var rateDownload: Int = 0
+    public var rateUpload: Int = 0
+    public var totalSize: Int64 = 0
+    public var downloadedEver: Int64 = 0
+    public var uploadedEver: Int64 = 0
+    public var uploadRatio: Double = 0
+    public var eta: Int = -1
+    public var peersConnected: Int = 0
+    public var peersSendingToUs: Int = 0
+    public var peersGettingFromUs: Int = 0
+    public var isFinished: Bool = false
+    public var error: Int = 0
+    public var errorString: String = ""
+    public var addedDate: Int = 0
+    public var queuePosition: Int = 0
+    public var sizeWhenDone: Int64 = 0
+    public var leftUntilDone: Int64 = 0
+    public var magnetLink: String = ""
+    public var downloadDir: String = ""
 
     // Detail-only fields (nil after a plain list poll).
-    var hashString: String?
-    var comment: String?
-    var creator: String?
-    var dateCreated: Int?
-    var doneDate: Int?
-    var activityDate: Int?
-    var pieceCount: Int?
-    var pieceSize: Int64?
-    var isPrivate: Bool?
-    var haveValid: Int64?
-    var haveUnchecked: Int64?
-    var corruptEver: Int64?
-    var desiredAvailable: Int64?
-    var secondsDownloading: Int?
-    var secondsSeeding: Int?
-    var seedRatioLimit: Double?
-    var seedRatioMode: Int?
-    var uploadLimit: Int?
-    var uploadLimited: Bool?
-    var downloadLimit: Int?
-    var downloadLimited: Bool?
-    var peerLimit: Int?
-    var files: [TorrentFile]?
-    var fileStats: [TorrentFileStats]?
-    var peers: [TorrentPeer]?
-    var trackerStats: [TrackerStat]?
+    public var hashString: String?
+    public var comment: String?
+    public var creator: String?
+    public var dateCreated: Int?
+    public var doneDate: Int?
+    public var activityDate: Int?
+    public var pieceCount: Int?
+    public var pieceSize: Int64?
+    public var isPrivate: Bool?
+    public var haveValid: Int64?
+    public var haveUnchecked: Int64?
+    public var corruptEver: Int64?
+    public var desiredAvailable: Int64?
+    public var secondsDownloading: Int?
+    public var secondsSeeding: Int?
+    public var seedRatioLimit: Double?
+    public var seedRatioMode: Int?
+    public var uploadLimit: Int?
+    public var uploadLimited: Bool?
+    public var downloadLimit: Int?
+    public var downloadLimited: Bool?
+    public var peerLimit: Int?
+    public var files: [TorrentFile]?
+    public var fileStats: [TorrentFileStats]?
+    public var peers: [TorrentPeer]?
+    public var trackerStats: [TrackerStat]?
 
     enum CodingKeys: String, CodingKey {
         case id, name, status, percentDone, metadataPercentComplete
@@ -86,9 +86,9 @@ struct Torrent: Codable, Identifiable, Equatable {
         case files, fileStats, peers, trackerStats
     }
 
-    init() {}
+    public init() {}
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         func d<T: Decodable>(_ k: CodingKeys, _ fallback: T) -> T {
             (try? c.decodeIfPresent(T.self, forKey: k)).flatMap { $0 } ?? fallback
@@ -151,19 +151,19 @@ struct Torrent: Codable, Identifiable, Equatable {
     // MARK: Derived
 
     /// Visual/grouping state, mirroring `linux/flinger/ui/style.py: torrent_state`.
-    enum State: String, CaseIterable {
+    public enum State: String, CaseIterable, Sendable {
         case error, magnetizing, complete, paused, verifying, queued, downloading, seeding
     }
 
     /// Order the popover renders status sections in — errors first, because
     /// they're the only ones that need you. Every value `group` can return must
     /// appear here or those rows would have nowhere to render.
-    static let groupOrder = ["Error", "Downloading", "Verifying", "Seeding", "Paused", "Finished"]
+    public static let groupOrder = ["Error", "Downloading", "Verifying", "Seeding", "Paused", "Finished"]
 
     /// Apply the search filter, then bucket by status into `groupOrder`,
     /// preserving server order within a group and omitting groups that end up
     /// empty. Pure, so the popover's list content can be tested without a store.
-    static func grouped(_ torrents: [Torrent],
+    public static func grouped(_ torrents: [Torrent],
                         matching search: String = "") -> [(name: String, torrents: [Torrent])] {
         let needle = search.trimmingCharacters(in: .whitespaces).lowercased()
         let visible = needle.isEmpty
@@ -174,7 +174,7 @@ struct Torrent: Codable, Identifiable, Equatable {
         return groupOrder.compactMap { name in buckets[name].map { (name, $0) } }
     }
 
-    var state: State {
+    public var state: State {
         if !errorString.isEmpty { return .error }
         if metadataPercentComplete < 1 { return .magnetizing }
         switch status {
@@ -192,7 +192,7 @@ struct Torrent: Codable, Identifiable, Equatable {
     }
 
     /// Section header this torrent sorts under in the popover.
-    var group: String {
+    public var group: String {
         switch state {
         case .downloading, .magnetizing, .queued: return "Downloading"
         case .verifying: return "Verifying"
@@ -205,28 +205,28 @@ struct Torrent: Codable, Identifiable, Equatable {
 
     /// Fraction to render in the progress bar: metadata progress while
     /// magnetizing, download progress otherwise.
-    var displayFraction: Double {
+    public var displayFraction: Double {
         state == .magnetizing ? metadataPercentComplete : percentDone
     }
 
-    var isComplete: Bool { percentDone >= 1 && metadataPercentComplete >= 1 }
-    var isPaused: Bool { status == TorrentStatus.stopped }
+    public var isComplete: Bool { percentDone >= 1 && metadataPercentComplete >= 1 }
+    public var isPaused: Bool { status == TorrentStatus.stopped }
 }
 
-struct TorrentFile: Codable, Equatable {
-    var name: String = ""
-    var length: Int64 = 0
-    var bytesCompleted: Int64 = 0
+public struct TorrentFile: Codable, Equatable, Sendable {
+    public var name: String = ""
+    public var length: Int64 = 0
+    public var bytesCompleted: Int64 = 0
 
     /// Declaring `init(from:)` suppresses the synthesized memberwise init, and
     /// building one by hand is how the tree tests state their fixtures.
-    init(name: String = "", length: Int64 = 0, bytesCompleted: Int64 = 0) {
+    public init(name: String = "", length: Int64 = 0, bytesCompleted: Int64 = 0) {
         self.name = name
         self.length = length
         self.bytesCompleted = bytesCompleted
     }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         name = (try? c.decodeIfPresent(String.self, forKey: .name)).flatMap { $0 } ?? ""
         length = (try? c.decodeIfPresent(Int64.self, forKey: .length)).flatMap { $0 } ?? 0
@@ -234,20 +234,20 @@ struct TorrentFile: Codable, Equatable {
     }
 }
 
-struct TorrentFileStats: Codable, Equatable {
-    var bytesCompleted: Int64 = 0
+public struct TorrentFileStats: Codable, Equatable, Sendable {
+    public var bytesCompleted: Int64 = 0
     /// Serialized as 0/1, not a boolean — decoded through `JSONValue` so both
     /// spellings work.
-    var wanted: Bool = true
-    var priority: Int = 0
+    public var wanted: Bool = true
+    public var priority: Int = 0
 
     enum CodingKeys: String, CodingKey { case bytesCompleted, wanted, priority }
 
     /// Stand-in when the server sends fewer `fileStats` than `files` (seen on
     /// some reimplementations mid-metadata-fetch).
-    init() {}
+    public init() {}
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         bytesCompleted = (try? c.decodeIfPresent(Int64.self, forKey: .bytesCompleted)).flatMap { $0 } ?? 0
         priority = (try? c.decodeIfPresent(Int.self, forKey: .priority)).flatMap { $0 } ?? 0
@@ -256,18 +256,18 @@ struct TorrentFileStats: Codable, Equatable {
     }
 }
 
-struct TorrentPeer: Codable, Equatable, Identifiable {
-    var address: String = ""
-    var clientName: String = ""
-    var flagStr: String = ""
-    var progress: Double = 0
-    var rateToClient: Int = 0
-    var rateToPeer: Int = 0
-    var port: Int = 0
+public struct TorrentPeer: Codable, Equatable, Identifiable, Sendable {
+    public var address: String = ""
+    public var clientName: String = ""
+    public var flagStr: String = ""
+    public var progress: Double = 0
+    public var rateToClient: Int = 0
+    public var rateToPeer: Int = 0
+    public var port: Int = 0
 
-    var id: String { "\(address):\(port)" }
+    public var id: String { "\(address):\(port)" }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         func d<T: Decodable>(_ k: CodingKeys, _ fallback: T) -> T {
             (try? c.decodeIfPresent(T.self, forKey: k)).flatMap { $0 } ?? fallback
@@ -282,20 +282,20 @@ struct TorrentPeer: Codable, Equatable, Identifiable {
     }
 }
 
-struct TrackerStat: Codable, Equatable, Identifiable {
-    var host: String = ""
-    var announce: String = ""
-    var lastAnnounceResult: String = ""
-    var lastAnnounceSucceeded: Bool = true
-    var seederCount: Int = -1
-    var leecherCount: Int = -1
-    var nextAnnounceTime: Int = 0
-    var tier: Int = 0
+public struct TrackerStat: Codable, Equatable, Identifiable, Sendable {
+    public var host: String = ""
+    public var announce: String = ""
+    public var lastAnnounceResult: String = ""
+    public var lastAnnounceSucceeded: Bool = true
+    public var seederCount: Int = -1
+    public var leecherCount: Int = -1
+    public var nextAnnounceTime: Int = 0
+    public var tier: Int = 0
 
-    var id: String { announce.isEmpty ? host : announce }
-    var displayName: String { host.isEmpty ? announce : host }
+    public var id: String { announce.isEmpty ? host : announce }
+    public var displayName: String { host.isEmpty ? announce : host }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         func d<T: Decodable>(_ k: CodingKeys, _ fallback: T) -> T {
             (try? c.decodeIfPresent(T.self, forKey: k)).flatMap { $0 } ?? fallback
@@ -313,14 +313,14 @@ struct TrackerStat: Codable, Equatable, Identifiable {
 
 /// `session-stats`: the live speeds plus the two cumulative blocks the
 /// statistics window renders side by side.
-struct SessionStats: Codable, Equatable {
-    var downloadSpeed: Int = 0
-    var uploadSpeed: Int = 0
-    var torrentCount: Int = 0
-    var activeTorrentCount: Int = 0
-    var pausedTorrentCount: Int = 0
-    var currentStats: StatsBlock = StatsBlock()
-    var cumulativeStats: StatsBlock = StatsBlock()
+public struct SessionStats: Codable, Equatable, Sendable {
+    public var downloadSpeed: Int = 0
+    public var uploadSpeed: Int = 0
+    public var torrentCount: Int = 0
+    public var activeTorrentCount: Int = 0
+    public var pausedTorrentCount: Int = 0
+    public var currentStats: StatsBlock = StatsBlock()
+    public var cumulativeStats: StatsBlock = StatsBlock()
 
     enum CodingKeys: String, CodingKey {
         case downloadSpeed, uploadSpeed, torrentCount, activeTorrentCount, pausedTorrentCount
@@ -328,9 +328,9 @@ struct SessionStats: Codable, Equatable {
         case cumulativeStats = "cumulative-stats"
     }
 
-    init() {}
+    public init() {}
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         func d<T: Decodable>(_ k: CodingKeys, _ fallback: T) -> T {
             (try? c.decodeIfPresent(T.self, forKey: k)).flatMap { $0 } ?? fallback
@@ -345,16 +345,16 @@ struct SessionStats: Codable, Equatable {
     }
 }
 
-struct StatsBlock: Codable, Equatable {
-    var uploadedBytes: Int64 = 0
-    var downloadedBytes: Int64 = 0
-    var filesAdded: Int = 0
-    var sessionCount: Int = 0
-    var secondsActive: Int = 0
+public struct StatsBlock: Codable, Equatable, Sendable {
+    public var uploadedBytes: Int64 = 0
+    public var downloadedBytes: Int64 = 0
+    public var filesAdded: Int = 0
+    public var sessionCount: Int = 0
+    public var secondsActive: Int = 0
 
-    init() {}
+    public init() {}
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         func d<T: Decodable>(_ k: CodingKeys, _ fallback: T) -> T {
             (try? c.decodeIfPresent(T.self, forKey: k)).flatMap { $0 } ?? fallback
@@ -367,7 +367,7 @@ struct StatsBlock: Codable, Equatable {
     }
 
     /// "—" when nothing has been downloaded, matching the Python dialog.
-    var ratioText: String {
+    public var ratioText: String {
         guard downloadedBytes > 0 else { return "—" }
         return String(format: "%.2f", Double(uploadedBytes) / Double(downloadedBytes))
     }
@@ -375,19 +375,19 @@ struct StatsBlock: Codable, Equatable {
 
 /// The `session-get` fields the app actually reads. Everything is optional:
 /// we request narrow field lists, so most keys are absent most of the time.
-struct SessionSettings: Codable, Equatable {
-    var version: String?
-    var rpcVersion: Int?
-    var altSpeedEnabled: Bool?
-    var downloadDir: String?
-    var speedLimitDown: Int?
-    var speedLimitDownEnabled: Bool?
-    var speedLimitUp: Int?
-    var speedLimitUpEnabled: Bool?
-    var altSpeedDown: Int?
-    var altSpeedUp: Int?
-    var seedRatioLimit: Double?
-    var seedRatioLimited: Bool?
+public struct SessionSettings: Codable, Equatable, Sendable {
+    public var version: String?
+    public var rpcVersion: Int?
+    public var altSpeedEnabled: Bool?
+    public var downloadDir: String?
+    public var speedLimitDown: Int?
+    public var speedLimitDownEnabled: Bool?
+    public var speedLimitUp: Int?
+    public var speedLimitUpEnabled: Bool?
+    public var altSpeedDown: Int?
+    public var altSpeedUp: Int?
+    public var seedRatioLimit: Double?
+    public var seedRatioLimited: Bool?
 
     enum CodingKeys: String, CodingKey {
         case version
@@ -407,9 +407,9 @@ struct SessionSettings: Codable, Equatable {
 
 /// `torrent-add` outcome: the server reports a fresh add and a duplicate under
 /// different keys, and the caller needs to tell them apart for the notification.
-struct AddOutcome: Equatable {
-    enum Kind: String { case added, duplicate }
-    var kind: Kind
-    var id: Int
-    var name: String
+public struct AddOutcome: Equatable, Sendable {
+    public enum Kind: String, Sendable { case added, duplicate }
+    public var kind: Kind
+    public var id: Int
+    public var name: String
 }

@@ -5,8 +5,8 @@ import Foundation
 /// Transmission reports sizes in SI units (1000-based), so we do too. Every
 /// function here is pure and AppKit-free; the unit tests assert the same
 /// expectations as the Python suite so the two apps read identically.
-enum Format {
-    static func size(_ n: Double) -> String {
+public enum Format: Sendable {
+    public static func size(_ n: Double) -> String {
         var value = n
         for unit in ["B", "KB", "MB", "GB", "TB"] {
             if abs(value) < 1000 {
@@ -19,15 +19,15 @@ enum Format {
         return String(format: "%.1f PB", value)
     }
 
-    static func size(_ n: Int64) -> String { size(Double(n)) }
+    public static func size(_ n: Int64) -> String { size(Double(n)) }
 
-    static func speed(_ n: Double) -> String { "\(size(n))/s" }
+    public static func speed(_ n: Double) -> String { "\(size(n))/s" }
 
-    static func speed(_ n: Int) -> String { speed(Double(n)) }
+    public static func speed(_ n: Int) -> String { speed(Double(n)) }
 
     /// Compact speed for the menu bar, where every pixel is contested:
     /// "1.2M" rather than "1.2 MB/s". Empty for zero.
-    static func speedShort(_ n: Int) -> String {
+    public static func speedShort(_ n: Int) -> String {
         guard n > 0 else { return "" }
         var value = Double(n)
         for unit in ["", "K", "M", "G"] {
@@ -41,7 +41,7 @@ enum Format {
         return String(format: "%.0fT", value)
     }
 
-    static func eta(_ seconds: Int?) -> String {
+    public static func eta(_ seconds: Int?) -> String {
         guard let seconds, seconds >= 0 else { return "" }
         if seconds >= 86400 { return "\(seconds / 86400)d \(seconds % 86400 / 3600)h" }
         if seconds >= 3600 { return "\(seconds / 3600)h \(seconds % 3600 / 60)m" }
@@ -49,7 +49,7 @@ enum Format {
         return "\(seconds)s"
     }
 
-    static let statusNames: [Int: String] = [
+    public static let statusNames: [Int: String] = [
         0: "Paused",
         1: "Queued to verify",
         2: "Verifying",
@@ -59,7 +59,7 @@ enum Format {
         6: "Seeding",
     ]
 
-    static func statusName(_ code: Int) -> String {
+    public static func statusName(_ code: Int) -> String {
         statusNames[code] ?? "Unknown (\(code))"
     }
 
@@ -69,7 +69,7 @@ enum Format {
         return f
     }()
 
-    static func date(_ epoch: Int?) -> String {
+    public static func date(_ epoch: Int?) -> String {
         guard let epoch, epoch > 0 else { return "—" }
         return dateFormatter.string(from: Date(timeIntervalSince1970: TimeInterval(epoch)))
     }
@@ -78,7 +78,7 @@ enum Format {
 
     /// Translate a path on the server to its location under a local mount.
     /// Returns nil when the mapping isn't configured or doesn't apply.
-    static func mapRemotePath(_ remotePath: String, remotePrefix: String, localPrefix: String) -> String? {
+    public static func mapRemotePath(_ remotePath: String, remotePrefix: String, localPrefix: String) -> String? {
         guard !remotePath.isEmpty, !remotePrefix.isEmpty, !localPrefix.isEmpty else { return nil }
         let path = trimTrailingSlashes(remotePath)
         let prefix = trimTrailingSlashes(remotePrefix)
@@ -96,7 +96,7 @@ enum Format {
 
     /// Deepest common ancestor of the server-side download dirs — used to infer
     /// the share root when no explicit remote prefix is configured.
-    static func commonRemoteRoot(_ paths: [String]) -> String? {
+    public static func commonRemoteRoot(_ paths: [String]) -> String? {
         let absolute = paths
             .filter { !$0.isEmpty && $0.hasPrefix("/") }
             .map { trimTrailingSlashes($0) }
@@ -123,7 +123,7 @@ enum Format {
     /// exists under the mount — this self-discovers the alignment even when the
     /// share is exported at a different depth than the configured/derived
     /// prefix. Only ever returns a path that exists locally.
-    static func resolveLocalPath(
+    public static func resolveLocalPath(
         remoteDir: String,
         remotePrefix: String,
         localPrefix: String,
@@ -144,7 +144,7 @@ enum Format {
     }
 
     /// Best-effort human name for a magnet URI or .torrent path.
-    static func linkDisplayName(_ link: String) -> String {
+    public static func linkDisplayName(_ link: String) -> String {
         if link.hasPrefix("magnet:") {
             let query = link.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
                 .dropFirst().first.map(String.init) ?? ""

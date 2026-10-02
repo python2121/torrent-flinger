@@ -1,4 +1,5 @@
 import Foundation
+import TorrentFlingerCore
 
 /// Ensures only one menubar GUI instance runs at a time.
 ///

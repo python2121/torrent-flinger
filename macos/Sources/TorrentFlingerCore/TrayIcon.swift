@@ -7,7 +7,7 @@ import Foundation
 /// is a 16pt monochrome silhouette, and anything finer-grained than this is
 /// unreadable at that size. Per-torrent detail belongs in the popover, not the
 /// menu bar.
-enum TrayIcon: String, CaseIterable {
+public enum TrayIcon: String, CaseIterable, Sendable {
     /// Nothing in flight — the horseshoe magnet.
     case idle
     /// Actively pulling bytes — a down arrow.
@@ -19,10 +19,10 @@ enum TrayIcon: String, CaseIterable {
 
     /// How long the "added" glyph stays up before falling back to the real
     /// state. Matches the Linux build.
-    static let addedDuration: TimeInterval = 3
+    public static let addedDuration: TimeInterval = 3
 
     /// Asset basename, shared with the Linux build.
-    var assetName: String { "tray-\(rawValue)" }
+    public var assetName: String { "tray-\(rawValue)" }
 
     /// Whether the menu bar draws the glyph, given whether the live speeds are
     /// showing beside it.
@@ -35,14 +35,14 @@ enum TrayIcon: String, CaseIterable {
     /// it's dropped and the numbers stand alone. Every other state keeps its
     /// glyph, and so does downloading when speeds are switched off — otherwise
     /// the status item would render completely empty.
-    func showsGlyph(speedsVisible: Bool) -> Bool {
+    public func showsGlyph(speedsVisible: Bool) -> Bool {
         !(self == .downloading && speedsVisible)
     }
 
     /// Stand-in when the bundled asset can't be loaded — i.e. the `swift run`
     /// dev loop, which has no bundle. Close enough to keep the dev build
     /// legible without pretending to be the real artwork.
-    var fallbackSymbol: String {
+    public var fallbackSymbol: String {
         switch self {
         case .idle: return "magnifyingglass.circle"
         case .downloading: return "arrow.down"
@@ -57,7 +57,7 @@ enum TrayIcon: String, CaseIterable {
     ///
     /// Note "downloading" keys off download speed alone — a seeding-only
     /// session shows the magnet, because a down arrow would be a lie.
-    static func current(connected: Bool, downloadSpeed: Int, recentlyAdded: Bool) -> TrayIcon {
+    public static func current(connected: Bool, downloadSpeed: Int, recentlyAdded: Bool) -> TrayIcon {
         if recentlyAdded { return .added }
         if !connected { return .error }
         if downloadSpeed > 0 { return .downloading }

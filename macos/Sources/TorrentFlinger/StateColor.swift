@@ -1,6 +1,7 @@
 #if os(macOS)
 import AppKit
 import SwiftUI
+import TorrentFlingerCore
 
 /// The app's one color/glyph vocabulary for torrent state — the macOS
 /// counterpart of `linux/flinger/ui/style.py`.

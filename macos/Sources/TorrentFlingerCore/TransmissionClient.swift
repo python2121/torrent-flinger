@@ -2,7 +2,7 @@ import Foundation
 
 /// Errors talking to the Transmission server. `errorDescription` is what the
 /// popover footer and the error banners show, so keep the strings short.
-enum TransmissionError: LocalizedError, Equatable {
+public enum TransmissionError: LocalizedError, Equatable, Sendable {
     case connectionFailed(String)
     case localNetworkBlocked
     case authFailed
@@ -11,15 +11,20 @@ enum TransmissionError: LocalizedError, Equatable {
     case notFound(Int)
     case badRequest(String)
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case .connectionFailed(let reason): return reason
         case .localNetworkBlocked:
             // URLSession reports this as "The Internet connection appears to be
             // offline", which is actively misleading when the real cause is a
             // missing permission and the browser can reach the same server.
+            #if os(macOS)
             return "macOS is blocking local network access — allow Torrent Flinger in "
                  + "System Settings › Privacy & Security › Local Network"
+            #else
+            return "iOS is blocking local network access — allow Torrent Flinger in "
+                 + "Settings › Privacy & Security › Local Network"
+            #endif
         case .authFailed: return "authentication failed — check username/password"
         case .http(let code, let reason): return "HTTP \(code): \(reason)"
         case .rpc(let message): return message
@@ -37,8 +42,8 @@ enum TransmissionError: LocalizedError, Equatable {
 ///
 /// Protocol reference:
 /// https://github.com/transmission/transmission/blob/main/docs/rpc-spec.md
-actor TransmissionClient {
-    static let torrentFields: [String] = [
+public actor TransmissionClient {
+    public static let torrentFields: [String] = [
         "id", "name", "status", "percentDone", "metadataPercentComplete",
         "rateDownload", "rateUpload", "totalSize", "downloadedEver",
         "uploadedEver", "uploadRatio", "eta", "peersConnected",
@@ -48,7 +53,7 @@ actor TransmissionClient {
     ]
 
     /// Extra fields fetched only for the details view of a single torrent.
-    static let detailFields: [String] = torrentFields + [
+    public static let detailFields: [String] = torrentFields + [
         "hashString", "comment", "creator", "dateCreated", "doneDate",
         "activityDate", "pieceCount", "pieceSize", "isPrivate", "haveValid",
         "haveUnchecked", "corruptEver", "desiredAvailable",
@@ -58,13 +63,13 @@ actor TransmissionClient {
         "trackerStats",
     ]
 
-    let url: URL
+    public let url: URL
     private let username: String
     private let password: String
     private let session: URLSession
     private var sessionID = ""
 
-    init(urlString: String, username: String = "", password: String = "",
+    public init(urlString: String, username: String = "", password: String = "",
          timeout: TimeInterval = 10, verifyTLS: Bool = true,
          session: URLSession? = nil) {
         // A malformed URL can only come from the options dialog; fall back to
@@ -89,7 +94,7 @@ actor TransmissionClient {
         }
     }
 
-    init(config: Config, session: URLSession? = nil) {
+    public init(config: Config, session: URLSession? = nil) {
         self.init(urlString: config.rpcURL, username: config.username,
                   password: config.password, verifyTLS: config.verifyTLS,
                   session: session)
@@ -193,7 +198,7 @@ actor TransmissionClient {
 
     private struct TorrentList: Decodable { let torrents: [Torrent] }
 
-    func torrents() async throws -> [Torrent] {
+    public func torrents() async throws -> [Torrent] {
         let payload = try await call(
             "torrent-get",
             .object(["fields": .strings(Self.torrentFields)]),
@@ -201,16 +206,16 @@ actor TransmissionClient {
         return payload?.torrents ?? []
     }
 
-    func sessionStats() async throws -> SessionStats {
+    public func sessionStats() async throws -> SessionStats {
         try await call("session-stats", as: SessionStats.self) ?? SessionStats()
     }
 
-    func sessionGet(_ fields: [String]? = nil) async throws -> SessionSettings {
+    public func sessionGet(_ fields: [String]? = nil) async throws -> SessionSettings {
         let args: JSONValue? = fields.map { .object(["fields": .strings($0)]) }
         return try await call("session-get", args, as: SessionSettings.self) ?? SessionSettings()
     }
 
-    func torrentDetails(_ torrentID: Int) async throws -> Torrent {
+    public func torrentDetails(_ torrentID: Int) async throws -> Torrent {
         let payload = try await call(
             "torrent-get",
             .object(["ids": .ints([torrentID]), "fields": .strings(Self.detailFields)]),
@@ -243,18 +248,29 @@ actor TransmissionClient {
     }
 
     /// Add a magnet URI or a local `.torrent` file path.
-    func add(_ link: String, downloadDir: String? = nil, paused: Bool = false) async throws -> AddOutcome {
-        var args: [String: JSONValue] = ["paused": .bool(paused)]
+    public func add(_ link: String, downloadDir: String? = nil, paused: Bool = false) async throws -> AddOutcome {
+        if link.hasPrefix("magnet:") {
+            return try await add(arguments: ["filename": .string(link)],
+                                 downloadDir: downloadDir, paused: paused)
+        }
+        guard let data = FileManager.default.contents(atPath: link) else {
+            throw TransmissionError.badRequest("can't read \(link)")
+        }
+        return try await add(metainfo: data, downloadDir: downloadDir, paused: paused)
+    }
+
+    /// Add a `.torrent` file already in memory — what the iOS app has after
+    /// the system hands it a document, where there is no path worth keeping.
+    public func add(metainfo: Data, downloadDir: String? = nil, paused: Bool = false) async throws -> AddOutcome {
+        try await add(arguments: ["metainfo": .string(metainfo.base64EncodedString())],
+                      downloadDir: downloadDir, paused: paused)
+    }
+
+    private func add(arguments: [String: JSONValue], downloadDir: String?, paused: Bool) async throws -> AddOutcome {
+        var args = arguments
+        args["paused"] = .bool(paused)
         if let downloadDir, !downloadDir.isEmpty {
             args["download-dir"] = .string(downloadDir)
-        }
-        if link.hasPrefix("magnet:") {
-            args["filename"] = .string(link)
-        } else {
-            guard let data = FileManager.default.contents(atPath: link) else {
-                throw TransmissionError.badRequest("can't read \(link)")
-            }
-            args["metainfo"] = .string(data.base64EncodedString())
         }
         let payload = try await call("torrent-add", .object(args), as: AddPayload.self)
         if let duplicate = payload?.duplicate {
@@ -266,17 +282,17 @@ actor TransmissionClient {
 
     /// `ids == nil` means "all torrents" per the RPC spec; an empty array must
     /// stay a no-op rather than becoming "all".
-    func start(_ ids: [Int]? = nil) async throws {
+    public func start(_ ids: [Int]? = nil) async throws {
         if let ids, ids.isEmpty { return }
         try await call("torrent-start", ids.map { .object(["ids": .ints($0)]) })
     }
 
-    func stop(_ ids: [Int]? = nil) async throws {
+    public func stop(_ ids: [Int]? = nil) async throws {
         if let ids, ids.isEmpty { return }
         try await call("torrent-stop", ids.map { .object(["ids": .ints($0)]) })
     }
 
-    func remove(_ ids: [Int], deleteData: Bool = false) async throws {
+    public func remove(_ ids: [Int], deleteData: Bool = false) async throws {
         guard !ids.isEmpty else { return }
         try await call("torrent-remove",
                        .object(["ids": .ints(ids), "delete-local-data": .bool(deleteData)]))
@@ -287,30 +303,30 @@ actor TransmissionClient {
     /// `torrent-set` passthrough: files-wanted/-unwanted,
     /// priority-high/-normal/-low (file indices), seedRatioLimit/Mode,
     /// uploadLimit(ed), downloadLimit(ed), labels, …
-    func torrentSet(_ ids: [Int], _ args: [String: JSONValue]) async throws {
+    public func torrentSet(_ ids: [Int], _ args: [String: JSONValue]) async throws {
         var payload = args
         payload["ids"] = .ints(ids)
         try await call("torrent-set", .object(payload))
     }
 
-    func setLocation(_ ids: [Int], location: String, move: Bool = true) async throws {
+    public func setLocation(_ ids: [Int], location: String, move: Bool = true) async throws {
         try await call("torrent-set-location",
                        .object(["ids": .ints(ids), "location": .string(location), "move": .bool(move)]))
     }
 
-    func verify(_ ids: [Int]) async throws {
+    public func verify(_ ids: [Int]) async throws {
         try await call("torrent-verify", .object(["ids": .ints(ids)]))
     }
 
-    func reannounce(_ ids: [Int]) async throws {
+    public func reannounce(_ ids: [Int]) async throws {
         try await call("torrent-reannounce", .object(["ids": .ints(ids)]))
     }
 
-    enum QueueDirection: String, CaseIterable {
+    public enum QueueDirection: String, CaseIterable, Sendable {
         case top, up, down, bottom
     }
 
-    func queueMove(_ ids: [Int], _ where_: QueueDirection) async throws {
+    public func queueMove(_ ids: [Int], _ where_: QueueDirection) async throws {
         try await call("queue-move-\(where_.rawValue)", .object(["ids": .ints(ids)]))
     }
 
@@ -319,13 +335,13 @@ actor TransmissionClient {
         enum CodingKeys: String, CodingKey { case sizeBytes = "size-bytes" }
     }
 
-    func freeSpace(path: String) async throws -> Int64 {
+    public func freeSpace(path: String) async throws -> Int64 {
         let payload = try await call("free-space", .object(["path": .string(path)]),
                                      as: FreeSpacePayload.self)
         return payload?.sizeBytes ?? -1
     }
 
-    func sessionSet(_ args: [String: JSONValue]) async throws {
+    public func sessionSet(_ args: [String: JSONValue]) async throws {
         try await call("session-set", .object(args))
     }
 
@@ -334,7 +350,7 @@ actor TransmissionClient {
         enum CodingKeys: String, CodingKey { case portIsOpen = "port-is-open" }
     }
 
-    func portTest() async throws -> Bool {
+    public func portTest() async throws -> Bool {
         let payload = try await call("port-test", as: PortTestPayload.self)
         return payload?.portIsOpen ?? false
     }

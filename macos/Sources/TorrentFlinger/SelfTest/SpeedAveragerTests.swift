@@ -1,5 +1,6 @@
 #if DEBUG
 import Foundation
+@testable import TorrentFlingerCore
 
 /// The menu bar's speed smoothing: which tier a transfer is in, how often the
 /// displayed value is allowed to move, and how the average over the window is

@@ -1,7 +1,8 @@
 # TorrentFlinger (macOS) — Feature Map
 
-TorrentFlinger is a single-target Swift Package macOS menu-bar app that views
-and administers a **remote Transmission server**, and gives magnet links and
+TorrentFlinger is a two-target Swift Package (a Foundation-only
+`TorrentFlingerCore` library plus the `TorrentFlinger` executable) — a macOS
+menu-bar app that views and administers a **remote Transmission server**, and gives magnet links and
 `.torrent` files somewhere to go without a browser extension. It's a port of
 the PySide6 tray app in `../linux/flinger/`: the same RPC feature set and the same
 `config.json`, rehoused in a SwiftUI panel hanging off an `NSStatusItem`. It
@@ -14,7 +15,7 @@ items with a POSIX file lock.
 
 ## Feature areas
 
-### Core (AppKit-free — `Sources/TorrentFlinger/Core/`)
+### Core (Foundation-only — `Sources/TorrentFlingerCore/`, shared with `../ios`)
 
 - **Transmission RPC client** — `TransmissionClient` is an `actor` over
   `URLSession` covering the pre-4.1 protocol: `torrent-get` (list and detail
@@ -22,21 +23,21 @@ items with a POSIX file lock.
   `torrent-start`/`-stop`/`-remove`/`-set`/`-set-location`/`-verify`/`-reannounce`,
   `queue-move-*`, `free-space`, `port-test`. Actor isolation exists because the
   CSRF session id is mutable state shared across concurrent calls.
-  `Core/TransmissionClient.swift`
+  `TorrentFlingerCore/TransmissionClient.swift`
 - **CSRF 409 handshake** — a 409 response carries the session id to repeat the
   call with; the client retries exactly once, so a second 409 surfaces as a
-  real failure instead of looping. `Core/TransmissionClient.swift`
+  real failure instead of looping. `TorrentFlingerCore/TransmissionClient.swift`
 - **Auth, TLS and error mapping** — Basic auth from the config; 401/403 →
   `.authFailed`, other non-2xx → `.http`, transport failures →
   `.connectionFailed`, `result != "success"` → `.rpc`. An opt-out
   `InsecureTrustDelegate` accepts self-signed certificates only when the user
   has unticked "Verify TLS certificate". A malformed URL from the options
   dialog degrades to a clean per-call error rather than trapping at
-  construction. `Core/TransmissionClient.swift`
+  construction. `TorrentFlingerCore/TransmissionClient.swift`
 - **`ids` semantics** — `nil` means "all torrents" (the key is omitted from the
   wire payload); an empty array is a no-op that never reaches the server. The
   difference between pausing nothing and pausing everything.
-  `Core/TransmissionClient.swift`
+  `TorrentFlingerCore/TransmissionClient.swift`
 - **Lenient torrent decoding** — one `Torrent` struct serves both the list poll
   and the details view (detail-only fields stay nil after a list poll). Every
   field falls back to a documented default because Transmission 3.x, 4.x and
@@ -44,20 +45,20 @@ items with a POSIX file lock.
   -1 ("unknown") and `metadataPercentComplete` to 1. `fileStats[].wanted`
   decodes from either 0/1 or a boolean, and `peer-limit` is mapped through a
   `CodingKey` (kebab-case inside a camelCase object).
-  `Core/TransmissionModels.swift`
+  `TorrentFlingerCore/TransmissionModels.swift`
 - **Torrent state classification** — `Torrent.state` reproduces
   `linux/flinger/ui/style.py: torrent_state`: an error string wins over everything,
   then incomplete metadata (magnetizing), then status, with stopped splitting
   into complete vs paused on `percentDone`. `Torrent.group` maps state onto the
   six popover sections and `Torrent.groupOrder` fixes their order (Error
-  first). `Core/TransmissionModels.swift`
+  first). `TorrentFlingerCore/TransmissionModels.swift`
 - **Config load/save** — `Config` is `Codable` against the *Python* key names
   (`protocol`, `rpc_path`, `verify_tls`, `custom_dirs`, …) at
   `~/Library/Application Support/torrent-flinger/config.json`, so the Linux and
   macOS builds share one file. Decoding is per-key lenient (bad value → default,
   never a throw) and unknown keys are ignored. Saves are atomic and chmod 0600,
   because the password lives in there. `CustomDir` omits `tv` when false, matching
-  Python's conditional key, so a round trip doesn't churn the file. `Core/Config.swift`
+  Python's conditional key, so a round trip doesn't churn the file. `TorrentFlingerCore/Config.swift`
 - **Formatting** — SI (1000-based) sizes and speeds, ETA (`1d 1h` / `1h 5m` /
   `45s`, empty for -1), status names, dates, a compact menu-bar speed
   (`1.2M`), and `linkDisplayName` for magnet `dn` parameters (with `+` → space)
@@ -67,16 +68,25 @@ items with a POSIX file lock.
   isn't "under" `/data/torrents`); `commonRemoteRoot` infers the share root
   from the default download dir plus the custom dirs; `resolveLocalPath` tries
   the prefix mapping and then probes path suffixes longest-first, returning only
-  paths that actually exist. `Core/Formats.swift`
+  paths that actually exist. `TorrentFlingerCore/Formats.swift`
 - **TV detection** — marker-based and precision-first: episode markers
   (`S01E02` / `3x07`), air-date naming (daily shows), then season packs
   (`S01`, `Season 2`, `Complete Series`, `Seasons 1-6`). Bare titles are
   deliberately not matched — movie/show collisions weren't worth the false
   positives. `findTVDir` reads the explicit per-directory flag, not the label.
-  `Core/TVDetect.swift`
+  `TorrentFlingerCore/TVDetect.swift`
 - **Dynamic JSON** — `JSONValue` covers the free-form request bodies
   (`torrent-set`, `session-set`) with literal conformances; responses decode
-  into concrete types. `Core/JSONValue.swift`
+  into concrete types. `TorrentFlingerCore/JSONValue.swift`
+- **Refresh-interval choices** — `PollChoices`: the twelve cadences from 1 s
+  to 2 m the Linux dialog offers, plus whatever off-menu interval a hand-edited
+  config holds (offered as-is, never rounded; zero and negatives fall back to
+  3 s). In Core so the phone's Settings offers the same list.
+  `TorrentFlingerCore/PollChoices.swift`
+- **Shared with the iPhone app** — the whole directory is a library target
+  the app in `../ios` links as a local package, which is why its API is
+  `public`, its models `Sendable`, and its one macOS-only call behind
+  `#if os(macOS)`. `Package.swift`
 
 ### Tray / menu-bar icon
 
@@ -88,7 +98,7 @@ items with a POSIX file lock.
   download speed alone — a seeding-only session shows the magnet, because a
   down arrow would be a lie. The Linux build implements the identical rules in
   `linux/flinger/core/trayicon.py`; both are tested.
-  `Core/TrayIcon.swift`
+  `TorrentFlingerCore/TrayIcon.swift`
 - **One monochrome artwork set for both builds** — `linux/flinger/assets/tray-*.svg`,
   copied into the bundle's Resources by `build-app.sh` and read directly by the
   Linux tray. Monochrome so each OS can tint it: AppKit does it for free via
@@ -100,7 +110,7 @@ items with a POSIX file lock.
 - **Dev-loop fallback** — `swift run` has no bundle to load resources from, so
   a missing asset falls back to an SF Symbol per state rather than showing a
   blank menu bar. Because that fallback is silent, a test asserts every state's
-  SVG actually exists. `Core/TrayIcon.swift`, `SelfTest/UILogicTests.swift`
+  SVG actually exists. `TorrentFlingerCore/TrayIcon.swift`, `SelfTest/UILogicTests.swift`
 - **Transient "added" flash** — `TorrentStore.flashAdded()` sets
   `recentlyAdded` for `TrayIcon.addedDuration` (3 s) when a torrent is
   *newly* accepted; a duplicate doesn't flash, since nothing changed. A second
@@ -130,7 +140,7 @@ items with a POSIX file lock.
 - **Actionable blocked-network error** — `TransmissionClient` maps -1009 to
   `TransmissionError.localNetworkBlocked`, whose message names the exact
   Settings pane instead of repeating URLSession's misleading "the Internet
-  connection appears to be offline". `Core/TransmissionClient.swift`
+  connection appears to be offline". `TorrentFlingerCore/TransmissionClient.swift`
 - **Info.plist declarations** — `NSLocalNetworkUsageDescription` (without it the
   permission can't be granted) and `NSAppTransportSecurity` with
   `NSAllowsArbitraryLoads` + `NSAllowsLocalNetworking` (Transmission's RPC is
@@ -182,7 +192,7 @@ items with a POSIX file lock.
   transfer and clears the bar. A gap wider than the widest window — a sleeping
   machine, a throttled timer — or a clock stepping backwards breaks continuity
   and starts the tiers over, rather than averaging the hole into the transfer.
-  `Core/SpeedAverager.swift`
+  `TorrentFlingerCore/SpeedAverager.swift`
 - **Path-mapping resolution at poll time** — the remote prefix is the explicit
   setting when set, else the common root of the server's download dir and every
   custom dir (so `/data/complete` and `/data/tv` both map through `/data`).
@@ -213,12 +223,12 @@ items with a POSIX file lock.
   `Selection.expansion`; `TorrentStore` only maps `EventModifiers` onto it.
   Selections and expansions are dropped for torrents that disappear
   server-side, and cleared when the panel closes so a reopened panel looks
-  freshly opened. `Core/Selection.swift`, `TorrentStore.swift`
+  freshly opened. `TorrentFlingerCore/Selection.swift`, `TorrentStore.swift`
 - **Grouping and search** — `Torrent.grouped(_:matching:)` applies the
   case-insensitive substring filter, buckets by status into `groupOrder`,
   preserves server order within a group (queue position is meaningful) and
   omits empty groups so no bare header renders. Pure, so the popover's list
-  content is testable without a store. `Core/TransmissionModels.swift`
+  content is testable without a store. `TorrentFlingerCore/TransmissionModels.swift`
 - **Actions** — start/stop (single, batch, and all), remove (with optional data
   deletion), add, copy magnets, open web UI; verify and reannounce live on
   `DetailsViewModel`, since the details window is the only place offering them. Each
@@ -333,7 +343,7 @@ items with a POSIX file lock.
   directory tree — folders show the size, progress and priority of everything
   under them and a tri-state checkbox that checks or skips the whole subtree in
   one call — plus high/normal/low priority via a multi-select context menu;
-  `FileNode` in `Core/FileTree.swift` builds the tree), *Peers*, *Trackers*
+  `FileNode` in `TorrentFlingerCore/FileTree.swift` builds the tree), *Peers*, *Trackers*
   (with failed-announce highlighting) and *Options*
   (per-torrent limits, seed-ratio mode, peer limit, queue moves). Refreshes
   every 3 s, pauses field updates while the Options tab is being edited, and
@@ -376,16 +386,16 @@ items with a POSIX file lock.
   `install.sh`
 - **Self-test suite** — a hand-rolled harness (`TestCase` collector,
   `TestEntry` registry, a runner that reports and returns an exit code), because
-  Command Line Tools ship neither XCTest nor swift-testing. 57 cases / 261
-  checks over formatting, path mapping, TV detection, config load/save, torrent
+  Command Line Tools ship neither XCTest nor swift-testing. Covers formatting, path mapping, TV detection, config load/save, torrent
   state classification, list grouping + search, selection arithmetic,
   custom-directory rules, and the RPC client against `MockRPC` — a
   `URLProtocol` reproducing the 409 handshake, 0/1 `wanted`, and kebab-case
   `peer-limit` — plus `FailingTransport`, which pins the URLSession-error
   mapping (notably that -1009 becomes the actionable local-network message and
-  that other transport errors don't). The whole directory is `#if DEBUG`,
-  dispatched by `--self-test` before `NSApplication`, so release builds contain
-  none of it.
+  that other transport errors don't). 97 cases / 468 checks. The whole
+  directory is `#if DEBUG`, dispatched by `--self-test` before `NSApplication`,
+  so release builds contain none of it; it reaches the library with
+  `@testable import TorrentFlingerCore`.
   `Sources/TorrentFlinger/SelfTest/`, `test.sh`
 - **Pre-push gate** — `.githooks/pre-push` runs `./test.sh` and, when a `.venv`
   exists, the Linux app's Python tests too, so a shared-repo push can't break
@@ -395,11 +405,11 @@ items with a POSIX file lock.
 
 | Type | Role | File |
 |---|---|---|
-| `TransmissionClient` | Actor wrapping the RPC protocol | `Core/TransmissionClient.swift` |
-| `Torrent`, `SessionStats`, `SessionSettings` | Lenient response models | `Core/TransmissionModels.swift` |
-| `Config`, `CustomDir` | Persisted settings, shared with the Linux build | `Core/Config.swift` |
-| `Format`, `TVDetect` | Display formatting, path mapping, TV heuristics | `Core/Formats.swift`, `Core/TVDetect.swift` |
-| `Selection` | Pure list-selection arithmetic (replace/extend/toggle) | `Core/Selection.swift` |
+| `TransmissionClient` | Actor wrapping the RPC protocol | `TorrentFlingerCore/TransmissionClient.swift` |
+| `Torrent`, `SessionStats`, `SessionSettings` | Lenient response models | `TorrentFlingerCore/TransmissionModels.swift` |
+| `Config`, `CustomDir` | Persisted settings, shared with the Linux build | `TorrentFlingerCore/Config.swift` |
+| `Format`, `TVDetect` | Display formatting, path mapping, TV heuristics | `TorrentFlingerCore/Formats.swift`, `TorrentFlingerCore/TVDetect.swift` |
+| `Selection` | Pure list-selection arithmetic (replace/extend/toggle) | `TorrentFlingerCore/Selection.swift` |
 | `Log`, `LocalNetwork` | Unified-log channel; Local Network permission bootstrap | `Log.swift`, `LocalNetwork.swift` |
 | `TorrentStore` | The single source of truth: polling, selection, actions | `TorrentStore.swift` |
 | `AppDelegate` | Status item, panel, links, window ownership | `AppDelegate.swift` |

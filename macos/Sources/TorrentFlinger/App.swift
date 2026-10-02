@@ -1,5 +1,6 @@
 #if os(macOS)
 import AppKit
+import TorrentFlingerCore
 
 @main
 struct TorrentFlingerMain {

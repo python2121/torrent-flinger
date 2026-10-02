@@ -1,7 +1,10 @@
 # The macOS build (`macos/`)
 
-A single-target Swift Package menu-bar app: SwiftUI inside AppKit chrome, no
-dependencies beyond the OS. Same feature set as the Linux build, rehoused.
+A Swift Package with two targets: `TorrentFlingerCore`, the Foundation-only
+library (RPC client, models, config, formatting), and `TorrentFlinger`, the
+menu-bar app — SwiftUI inside AppKit chrome, no dependencies beyond the OS.
+Same feature set as the Linux build, rehoused. The iPhone app in
+[`ios/`](ios.md) links the library target from here.
 
 Two documents already cover part of this ground and are the ones to keep
 current:
@@ -43,12 +46,21 @@ Sources/TorrentFlinger/
   LocalNetwork.swift     the Bonjour browse that unlocks LAN access
   SingleInstance.swift   POSIX flock
   StateColor.swift       state → colour
-  Log.swift              os.Logger wrapper
-  Core/                  AppKit-free, ported from flinger/core/
   SelfTest/              the whole test suite + debug tooling (#if DEBUG)
+Sources/TorrentFlingerCore/
+                         Foundation-only library, ported from flinger/core/,
+                         shared with the iPhone app (below)
 ```
 
-## `Core/` — the ported layer
+## `Sources/TorrentFlingerCore/` — the ported, shared layer
+
+A separate library target so the iPhone app can link it. Consequences: its
+API is `public` (a new type or member the UI needs must be too), its models
+are `Sendable` (they cross from the client actor to the main actor under
+Swift 6 on the phone), and it compiles for iOS — `import Foundation` only,
+with the one macOS-only call (`homeDirectoryForCurrentUser`) behind
+`#if os(macOS)`. The executable imports it as `import TorrentFlingerCore`;
+the self-tests use `@testable import` so they can still reach internals.
 
 | File | Notes |
 |---|---|
@@ -61,6 +73,8 @@ Sources/TorrentFlinger/
 | `TrayIcon.swift` | The four-state glyph rule, duplicated from `linux/flinger/core/trayicon.py`, plus `showsGlyph(speedsVisible:)` — macOS-only, because the Linux tray has no text label. |
 | `SpeedAverager.swift` | The menu bar's moving average. See below. |
 | `JSONValue.swift` | Dynamic JSON for free-form request bodies (`torrent-set`, `session-set`). Responses decode into concrete types; only requests need this. |
+| `PollChoices.swift` | The refresh cadences the settings screens offer, plus the rule for an off-menu value from a hand-edited config. Here rather than in the options window so the phone offers the same list. |
+| `Log.swift` | `os.Logger` wrapper (subsystem `io.github.python2121.TorrentFlinger`). In Core because the client logs transport failures. |
 
 **The rule for this directory**: logic the UI depends on lives here as pure
 functions, not inside `@MainActor` view models. Constructing a `TorrentStore`
@@ -93,7 +107,7 @@ field take keystrokes without activating the app.
 
 ## Speed smoothing
 
-`Core/SpeedAverager.swift` widens the menu-bar readout as a transfer settles:
+`TorrentFlingerCore/SpeedAverager.swift` widens the menu-bar readout as a transfer settles:
 live for the first 15 s, then a 15 s average refreshed every 5 s, then a 30 s
 average refreshed every 10 s. Transmission's own `downloadSpeed` covers about
 two seconds, so a raw reading in the menu bar is noise.

@@ -1,5 +1,6 @@
 #if DEBUG
 import Foundation
+@testable import TorrentFlingerCore
 
 /// A tiny hand-rolled test harness.
 ///

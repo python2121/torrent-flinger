@@ -1,5 +1,6 @@
 #if DEBUG
 import Foundation
+@testable import TorrentFlingerCore
 
 /// `TransmissionClient` against `MockRPC` — the Swift counterpart of the Python
 /// suite's `TestTransmissionClient`. These assert on the *wire format* as much

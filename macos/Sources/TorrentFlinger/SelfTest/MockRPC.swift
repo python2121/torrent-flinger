@@ -1,5 +1,6 @@
 #if DEBUG
 import Foundation
+@testable import TorrentFlingerCore
 
 /// A mock Transmission RPC server as a `URLProtocol`, mirroring the Python
 /// suite's `MockRPC` — including the protocol gotchas it encodes on purpose:

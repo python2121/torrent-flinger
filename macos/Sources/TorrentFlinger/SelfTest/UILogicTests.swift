@@ -1,5 +1,6 @@
 #if DEBUG
 import Foundation
+@testable import TorrentFlingerCore
 
 /// The pure logic behind the popover list and the options window: grouping +
 /// search, list selection arithmetic, the custom-directory rules, and the

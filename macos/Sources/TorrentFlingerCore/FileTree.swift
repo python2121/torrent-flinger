@@ -7,36 +7,36 @@ import Foundation
 /// act on in bulk. Folding it into directories is pure list arithmetic, so it
 /// lives here rather than in the view: `FileNode.tree` is the whole feature,
 /// and the window only draws it.
-struct FileNode: Identifiable, Equatable {
+public struct FileNode: Identifiable, Equatable, Sendable {
     /// Whether the files underneath this row are set to download.
-    enum Wanted: Equatable {
+    public enum Wanted: Equatable, Sendable {
         case on, off, mixed
 
         /// What a click does: anything not fully checked becomes checked.
-        var toggled: Bool { self != .on }
+        public var toggled: Bool { self != .on }
     }
 
     /// Stable across refreshes and unique even if a torrent lists the same path
     /// twice: files key off their index, directories off their path.
-    let id: String
+    public let id: String
     /// Just this level's component — the row shows the tree, not the path.
-    let name: String
+    public let name: String
     /// Every file index in this subtree, in server order. A file has exactly
     /// one; a directory has all of its descendants', which is what makes
     /// checking or prioritizing a whole folder one RPC call.
-    let indices: [Int]
-    let length: Int64
-    let completed: Int64
-    let wanted: Wanted
+    public let indices: [Int]
+    public let length: Int64
+    public let completed: Int64
+    public let wanted: Wanted
     /// Nil when the files underneath disagree.
-    let priority: Int?
+    public let priority: Int?
     /// Nil for files — `Table`'s outline uses this to decide what gets a
     /// disclosure triangle.
-    let children: [FileNode]?
+    public let children: [FileNode]?
 
-    var isDirectory: Bool { children != nil }
+    public var isDirectory: Bool { children != nil }
 
-    var donePercent: String {
+    public var donePercent: String {
         String(format: "%.0f%%", Double(completed) / Double(max(length, 1)) * 100)
     }
 
@@ -44,7 +44,7 @@ struct FileNode: Identifiable, Equatable {
     /// directory appears where its first file did, and files keep their
     /// original order within it. Missing `fileStats` entries fall back to the
     /// documented default (wanted, normal priority), same as the flat list did.
-    static func tree(files: [TorrentFile], stats: [TorrentFileStats]) -> [FileNode] {
+    public static func tree(files: [TorrentFile], stats: [TorrentFileStats]) -> [FileNode] {
         let root = Builder(name: "", path: "")
         for (index, file) in files.enumerated() {
             let stat = index < stats.count ? stats[index] : TorrentFileStats()
@@ -64,7 +64,7 @@ struct FileNode: Identifiable, Equatable {
     /// The file indices behind a set of selected rows, deduplicated and in
     /// server order — selecting a folder and one of its files must not send
     /// that file twice.
-    static func indices(for ids: Set<String>, in nodes: [FileNode]) -> [Int] {
+    public static func indices(for ids: Set<String>, in nodes: [FileNode]) -> [Int] {
         var found: Set<Int> = []
         func walk(_ node: FileNode) {
             if ids.contains(node.id) {

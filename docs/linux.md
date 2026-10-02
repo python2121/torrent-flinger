@@ -39,7 +39,7 @@ integration test drives.
 ## `linux/flinger/core/` — no Qt, ported to Swift
 
 Pure stdlib. Every module here has a Swift counterpart under
-`macos/Sources/TorrentFlinger/Core/` implementing the same rules; see
+`macos/Sources/TorrentFlingerCore/` implementing the same rules; see
 [architecture.md](architecture.md#the-one-decision-worth-defending-ported-not-shared).
 
 | File | Contents |

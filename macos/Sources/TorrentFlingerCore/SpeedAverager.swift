@@ -29,29 +29,34 @@ import Foundation
 /// Pure, and the clock is the caller's — `record` takes the timestamp — so the
 /// tiers are testable without a timer, per this build's rule that logic the UI
 /// leans on lives in `Core` as plain values.
-struct SpeedAverager {
-    struct Speeds: Equatable {
-        var download: Int = 0
-        var upload: Int = 0
+public struct SpeedAverager: Sendable {
+    public struct Speeds: Equatable, Sendable {
+        public var download: Int = 0
+        public var upload: Int = 0
 
-        static let zero = Speeds()
+        public init(download: Int = 0, upload: Int = 0) {
+            self.download = download
+            self.upload = upload
+        }
+
+        public static let zero = Speeds()
 
         /// Whether anything is moving — what decides if the menu bar shows
         /// numbers at all, and whether we keep sampling quickly.
-        var isActive: Bool { download > 0 || upload > 0 }
+        public var isActive: Bool { download > 0 || upload > 0 }
     }
 
-    struct Tier: Equatable {
+    public struct Tier: Equatable, Sendable {
         /// Activity age at which this tier takes over.
-        let age: TimeInterval
+        public let age: TimeInterval
         /// Trailing window to average. Zero means "show the live reading".
-        let window: TimeInterval
+        public let window: TimeInterval
         /// How often the displayed value is recomputed. Zero means every sample.
-        let refresh: TimeInterval
+        public let refresh: TimeInterval
     }
 
     /// Ordered by `age`; the last one whose age has passed wins.
-    static let tiers: [Tier] = [
+    public static let tiers: [Tier] = [
         Tier(age: 0, window: 0, refresh: 0),
         Tier(age: 15, window: 15, refresh: 5),
         Tier(age: 30, window: 30, refresh: 10),
@@ -64,10 +69,10 @@ struct SpeedAverager {
     /// out a stall is half of what the average is for. But not never, either —
     /// a finished download would otherwise leave a decaying ghost in the menu
     /// bar for a full window, and the glyph keys off the same numbers.
-    static let idleGrace: TimeInterval = 5
+    public static let idleGrace: TimeInterval = 5
 
     /// The value to display. Holds still between refreshes by design.
-    private(set) var displayed = Speeds.zero
+    public private(set) var displayed = Speeds.zero
 
     private struct Sample {
         let time: Date
@@ -91,16 +96,16 @@ struct SpeedAverager {
     /// anchor reading is abandoned as too old to be part of it.
     private static let spanTolerance = 1.5
 
-    init() {}
+    public init() {}
 
     /// Which tier a transfer of this age falls in.
-    static func tier(forAge age: TimeInterval) -> Tier {
+    public static func tier(forAge age: TimeInterval) -> Tier {
         tiers.last { age >= $0.age } ?? tiers[0]
     }
 
     /// How the current readout is derived, for the tooltip — nil while it's a
     /// live reading, since that needs no explanation.
-    var windowDescription: String? {
+    public var windowDescription: String? {
         guard let window = lastTier?.window, window > 0 else { return nil }
         return "\(Int(window)) s average"
     }
@@ -108,13 +113,13 @@ struct SpeedAverager {
     /// Whether a transfer is currently being tracked. Distinct from
     /// `displayed.isActive`: the average can still be non-zero for a moment
     /// after everything stops.
-    var isTracking: Bool { activityStart != nil }
+    public var isTracking: Bool { activityStart != nil }
 
     /// Feeds in one `session-stats` reading, returning true if `displayed`
     /// changed — so the caller can leave the published copy (and anything
     /// observing it) alone on the samples that only feed the average.
     @discardableResult
-    mutating func record(_ stats: SessionStats, at now: Date) -> Bool {
+    public mutating func record(_ stats: SessionStats, at now: Date) -> Bool {
         let live = Speeds(download: stats.downloadSpeed, upload: stats.uploadSpeed)
 
         // What the caller is showing right now. Every exit below reports
@@ -181,7 +186,7 @@ struct SpeedAverager {
 
     /// Drops everything — a disconnect, or a transfer that's over. The next
     /// reading starts the tiers again from live.
-    mutating func reset() {
+    public mutating func reset() {
         samples.removeAll(keepingCapacity: true)
         activityStart = nil
         lastRefresh = nil

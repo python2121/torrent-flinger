@@ -1,6 +1,7 @@
 #if os(macOS)
 import Foundation
 import Network
+import TorrentFlingerCore
 
 /// Forces macOS to register this app for the Local Network privacy permission.
 ///

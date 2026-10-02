@@ -36,6 +36,11 @@ reads.
 
 ## The Swift suite (`macos/Sources/TorrentFlinger/SelfTest/`)
 
+The suite lives in the executable target and reaches the library with
+`@testable import TorrentFlingerCore` (debug builds enable testability, and
+the suite only exists in debug builds). The iPhone app has no suite of its
+own: everything with logic worth testing is in Core, and that's covered here.
+
 **There is no `swift test` here, and no testing package.** Command Line Tools
 ship neither XCTest nor swift-testing, and pulling in a package dependency for a
 suite this size wasn't worth it. So the harness is hand-rolled:

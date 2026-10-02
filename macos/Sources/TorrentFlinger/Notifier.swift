@@ -1,6 +1,7 @@
 #if os(macOS)
 import Foundation
 import UserNotifications
+import TorrentFlingerCore
 
 /// Desktop notifications — the macOS stand-in for `QSystemTrayIcon.showMessage`.
 ///

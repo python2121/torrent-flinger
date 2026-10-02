@@ -1,6 +1,7 @@
 #if DEBUG
 import AppKit
 import SwiftUI
+@testable import TorrentFlingerCore
 
 /// Opens one of the app's windows on screen and nothing else, so its layout can
 /// be inspected (and screenshotted) without clicking through the menu bar —

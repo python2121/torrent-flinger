@@ -5,11 +5,19 @@ up, see the [root README](../README.md).
 
 ## What this is
 
-`TorrentFlinger` is a single-target Swift Package macOS menu-bar app
-(`Package.swift`, `Sources/TorrentFlinger/`). It's a port of the PySide6 tray
-app in `../linux/flinger/`: same Transmission RPC feature set, same `config.json`,
+`TorrentFlinger` is a Swift Package macOS menu-bar app with two targets
+(`Package.swift`): `TorrentFlingerCore` (`Sources/TorrentFlingerCore/`), the
+Foundation-only library, and `TorrentFlinger` (`Sources/TorrentFlinger/`), the
+AppKit + SwiftUI executable. It's a port of the PySide6 tray app in
+`../linux/flinger/`: same Transmission RPC feature set, same `config.json`,
 different shell (SwiftUI + AppKit instead of Qt, menu bar instead of system
 tray).
+
+**The library is shared with the iPhone app in `../ios/`**, which links this
+package from `../macos` as a local dependency and builds only the
+`TorrentFlingerCore` product. So Core has three extra rules — see "Things to
+know" below — and a change there is a change to the phone too; build both
+(`cd ../ios && ./build.sh`) before pushing a Core change.
 
 **The Linux app is off-limits.** Nothing in `macos/` may require a change to
 anything under `../linux/` — the Python package, its tests, its scripts or its
@@ -56,8 +64,9 @@ drives an `NSStatusItem` (menu bar) and a borderless `NSPanel` hosting
 `AppDelegate` to repaint the menu-bar item (hopped one runloop tick, because
 `objectWillChange` fires *before* the `@Published` write).
 
-`Sources/TorrentFlinger/Core/` is the AppKit-free layer and a direct port of
-`../linux/flinger/core/`:
+`Sources/TorrentFlingerCore/` is the Foundation-only layer and a direct port of
+`../linux/flinger/core/`. Everything the executable uses from it is reached via
+`import TorrentFlingerCore`:
 
 - **`TransmissionClient.swift`** — an `actor` over `URLSession`. Async/await
   instead of the Python version's blocking `urllib` + `QThreadPool`; an actor
@@ -73,6 +82,9 @@ drives an `NSStatusItem` (menu bar) and a borderless `NSPanel` hosting
   Python modules of the same name, key-for-key and rule-for-rule.
 - **`JSONValue.swift`** — dynamic JSON for the free-form request bodies
   (`torrent-set`, `session-set`). Responses decode into concrete types.
+- **`PollChoices.swift`**, **`Log.swift`** — the refresh-interval menu rules
+  (shared with the phone's Settings) and the unified-log wrapper (the client
+  logs transport failures, so it lives with the client).
 
 `TorrentStore.swift` owns polling (config's interval while the panel is open,
 30 s while it's closed), selection and expansion state, every mutating action,
@@ -112,7 +124,11 @@ what `build-app.sh` runs — compiles none of it into the shipping binary. If yo
 add a file under `SelfTest/`, wrap it the same way, or the release build will
 carry test code.
 
-Current coverage: 90 cases / 420 checks over formatting, path mapping, TV
+The suite is in the executable target and reaches the library with
+`@testable import TorrentFlingerCore` (SwiftPM debug builds enable
+testability; the release build never compiles the suite).
+
+Current coverage: 97 cases / 468 checks over formatting, path mapping, TV
 detection, config load/save, torrent state classification, list grouping +
 search, selection arithmetic, custom-directory rules, the Files tab's directory
 tree (`FileNode.tree`), the menu bar's speed smoothing (`SpeedAverager` — pure
@@ -123,7 +139,7 @@ against `MockRPC` (a `URLProtocol` reproducing the 409 handshake,
 **not** cover SwiftUI rendering or the AppKit panel — those are verified by
 running the app.
 
-Logic that the UI depends on lives in `Core/` as pure functions
+Logic that the UI depends on lives in `TorrentFlingerCore/` as pure functions
 (`Torrent.grouped`, `Selection.apply`, `CustomDir.markingTV`/`make`) rather than
 inside the `@MainActor` view models, specifically so it's testable: constructing
 a `TorrentStore` starts a poll timer and hits the network, which a test must
@@ -163,6 +179,17 @@ break the other target.
 
 ## Things to know before editing
 
+- **Core is a library the phone links, so three rules apply under
+  `Sources/TorrentFlingerCore/`.** (1) Anything the UI uses must be `public` —
+  a new model field, a new `Format` helper, a new client method. A missing
+  `public` fails the *executable's* build with "inaccessible due to 'internal'
+  protection level", which is the hint. (2) Every public struct/enum is
+  `Sendable`: the phone builds in Swift 6 language mode and its store is
+  `@MainActor`, so a non-Sendable value returned from the `TransmissionClient`
+  actor is a hard error there even though this Swift 5-mode package accepts it.
+  (3) Foundation only, and it has to compile for iOS: no AppKit, no `Process`,
+  and a macOS-only API goes behind `#if os(macOS)` with an iOS branch (see
+  `Config.directory`, and the `localNetworkBlocked` message).
 - **Never use `@State`; use `@ViewState`** (`ViewState.swift`). Since the
   macOS 27 SDK, `@State` is a macro backed by `libSwiftUIMacros.dylib`, which
   ships only inside Xcode — this machine has Command Line Tools only, so
@@ -250,7 +277,7 @@ break the other target.
   `linux/flinger/assets/tray-{idle,downloading,error,added}.svg` is one monochrome set
   consumed by both: `build-app.sh` copies it into the bundle, `linux/flinger/ui/style.py`
   tints it for Qt. The selection rules are duplicated deliberately —
-  `Core/TrayIcon.swift` and `linux/flinger/core/trayicon.py` — with matching tests on
+  `TorrentFlingerCore/TrayIcon.swift` and `linux/flinger/core/trayicon.py` — with matching tests on
   both sides, including one asserting the 3 s "added" duration is the same
   number in both. Keep them in step. Monochrome is a requirement, not a style
   choice: colour can't adapt to a dark panel or a tinted menu bar.

@@ -1,5 +1,6 @@
 #if DEBUG
 import Foundation
+@testable import TorrentFlingerCore
 
 /// The Files tab's tree: folding Transmission's flat path list into
 /// directories, the aggregates each folder row shows, and resolving a

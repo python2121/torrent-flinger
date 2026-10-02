@@ -1,5 +1,6 @@
 #if DEBUG
 import Foundation
+@testable import TorrentFlingerCore
 
 /// Config load/save, and the decode of torrent-shaped JSON into the state the
 /// popover groups and badges torrents by.
