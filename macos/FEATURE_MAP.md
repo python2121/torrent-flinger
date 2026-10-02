@@ -62,7 +62,17 @@ items with a POSIX file lock.
 - **Formatting** — SI (1000-based) sizes and speeds, ETA (`1d 1h` / `1h 5m` /
   `45s`, empty for -1), status names, dates, a compact menu-bar speed
   (`1.2M`), and `linkDisplayName` for magnet `dn` parameters (with `+` → space)
-  and percent-encoded file paths. `Core/Formats.swift`
+  and percent-encoded file paths. `TorrentFlingerCore/Formats.swift`
+- **Name truncation** — `Format.truncateName` shortens a torrent name from
+  the end while keeping its file extension (`Reacher.S04E05.1080p…mkv`); the
+  ellipsis takes the extension's period and the kept stem never ends in a
+  period or space. `splitExtension` recognises only `knownExtensions` — an
+  allowlist of real video/audio/archive/document suffixes — so
+  `filename.otherinfo` and `[YTS.MX]` aren't mistaken for files. The caller
+  supplies the measurement (`fits`), so the same binary search serves the Mac
+  (AppKit single-line widths), the phone (UIKit two-line heights) and the
+  Linux build (`QFontMetrics`, via the identical `truncate_name`), and tests
+  drive it with character counts. `TorrentFlingerCore/Formats.swift`
 - **Remote→local path mapping** — `mapRemotePath` translates a server path
   under a local mount (matching on path *components*, so `/data/torrents2`
   isn't "under" `/data/torrents`); `commonRemoteRoot` infers the share root
@@ -278,7 +288,9 @@ items with a POSIX file lock.
 - **Clipboard magnet offer** — opening the panel with a magnet link copied shows
   a banner offering to add it; dismissing remembers that link so it isn't
   re-offered. `TorrentStore.swift`, `PopoverView.swift`
-- **Expandable rows** — state badge, elided name, `↓/↑ speed · % · ETA`
+- **Expandable rows** — state badge, the name shortened from the end with its
+  extension kept (`Format.truncateName` against an AppKit measurement of the
+  row's actual width, because SwiftUI's truncation can't keep a suffix), `↓/↑ speed · % · ETA`
   subtitle (collapsing to the error string when in trouble, or size + ratio once
   complete), a slim state-colored progress bar, a three-state primary action
   (Remove when complete / Resume when paused / Pause when active — the ✕

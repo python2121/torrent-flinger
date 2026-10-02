@@ -13,6 +13,8 @@ struct TorrentRowView: View {
     var actions = PopoverActions()
 
     @ViewState private var hovering = false
+    /// Width the name has to fit in, reported by the layout; 0 until known.
+    @ViewState private var nameWidth: CGFloat = 0
 
     private var isSelected: Bool { store.selectedIDs.contains(torrent.id) }
     private var isExpanded: Bool { store.expandedIDs.contains(torrent.id) }
@@ -56,10 +58,15 @@ struct TorrentRowView: View {
         HStack(spacing: 8) {
             StateBadge(state: torrent.state)
             VStack(alignment: .leading, spacing: 3) {
-                Text(torrent.name)
+                // Shortened from the end but keeping the file extension —
+                // `Reacher.S04E05.1080p…mkv` — measured here rather than left
+                // to SwiftUI's truncation, which can't keep a suffix.
+                Text(displayName)
                     .font(.system(size: 12))
                     .lineLimit(1)
-                    .truncationMode(.middle)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { nameWidth = $0 }
                     .help(torrent.name)
                 Text(subtitle)
                     .font(.caption2)
@@ -76,6 +83,18 @@ struct TorrentRowView: View {
                 chevron
             }
         }
+    }
+
+    private static let nameFont = NSFont.systemFont(ofSize: 12)
+
+    private var displayName: String {
+        guard nameWidth > 0 else { return torrent.name }
+        let attributes: [NSAttributedString.Key: Any] = [.font: Self.nameFont]
+        // A point of slack: AppKit's measurement and SwiftUI's layout agree to
+        // within rounding, and a miss here would make SwiftUI add a second
+        // ellipsis over ours.
+        let limit = nameWidth - 1
+        return Format.truncateName(torrent.name) { ($0 as NSString).size(withAttributes: attributes).width <= limit }
     }
 
     /// `↓ 1.2 MB/s · ↑ 300 KB/s · 42% · 3m 10s`, collapsing to the error string

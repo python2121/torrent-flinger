@@ -108,6 +108,73 @@ def resolve_local_path(remote_dir: str, remote_prefix: str, local_prefix: str,
     return None
 
 
+# File extensions worth keeping visible when a name is shortened. An allowlist
+# rather than "whatever follows the last period", so ``filename.otherinfo``
+# isn't mistaken for a file and ``[YTS.MX]`` isn't an extension ``MX]``.
+# Lower-case; matching is case-insensitive. Mirrored in the Swift core
+# (``Format.knownExtensions``) — keep the two lists identical.
+KNOWN_EXTENSIONS = frozenset({
+    # video
+    "mkv", "mp4", "m4v", "avi", "mov", "wmv", "mpg", "mpeg", "ts", "m2ts", "webm",
+    "flv", "vob", "ogv", "3gp", "divx",
+    # audio
+    "mp3", "flac", "aac", "m4a", "m4b", "ogg", "opus", "wav", "wma", "ape", "alac",
+    "aiff", "dsf",
+    # images
+    "jpg", "jpeg", "png", "gif", "webp", "heic", "bmp", "tif", "tiff", "svg",
+    # documents and books
+    "pdf", "epub", "mobi", "azw", "azw3", "cbr", "cbz", "djvu", "txt", "doc",
+    "docx", "rtf",
+    # archives and disk images
+    "zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "xz", "zst", "iso", "img",
+    "dmg", "pkg", "exe", "msi", "apk", "deb", "rpm", "appimage", "bin",
+    # subtitles and torrent-adjacent
+    "srt", "sub", "idx", "ass", "ssa", "vtt", "nfo", "sfv", "par2", "cue", "torrent",
+})
+
+
+def split_extension(name: str) -> tuple[str, str]:
+    """Split a torrent name into stem and trailing file extension (``".mkv"``),
+    so the list can keep the extension visible when it shortens the name.
+
+    Only extensions in ``KNOWN_EXTENSIONS`` count, and the stem must be
+    non-empty. Returns ``(name, "")`` when there isn't one.
+    """
+    stem, dot, ext = name.rpartition(".")
+    if dot and stem and ext.lower() in KNOWN_EXTENSIONS:
+        return stem, dot + ext
+    return name, ""
+
+
+def truncate_name(name: str, fits) -> str:
+    """Shorten ``name`` from the end while keeping its extension:
+    ``Reacher.S04E05.1080p.WEB-DL.mkv`` becomes ``Reacher.S04E05.1080p…mkv``.
+
+    ``fits(text) -> bool`` is the caller's measurement — pixels in a widget,
+    characters in a test — and must be monotone (if a string fits, so does
+    every prefix of it). The ellipsis replaces the extension's period so the
+    break reads as one mark; trailing spaces and periods on the kept stem are
+    dropped for the same reason. Returns the name untouched when it fits, and
+    the bare ``…ext`` tail when nothing does.
+    """
+    if fits(name):
+        return name
+    stem, ext = split_extension(name)
+    tail = "…" + ext[1:]
+
+    def candidate(n: int) -> str:
+        return stem[:n].rstrip(" .") + tail
+
+    lo, hi = 0, len(stem)
+    while lo < hi:
+        mid = (lo + hi + 1) // 2
+        if fits(candidate(mid)):
+            lo = mid
+        else:
+            hi = mid - 1
+    return candidate(lo)
+
+
 def link_display_name(link: str) -> str:
     """Best-effort human name for a magnet URI or .torrent path."""
     if link.startswith("magnet:"):

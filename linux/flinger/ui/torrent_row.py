@@ -30,7 +30,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..core.formats import fmt_eta, fmt_size, fmt_speed, status_name
+from ..core.formats import fmt_eta, fmt_size, fmt_speed, status_name, truncate_name
 from .style import NEGATIVE, POSITIVE, argb, small_font, state_color, state_pixmap, torrent_state
 
 ROW_HEIGHT = 44
@@ -176,8 +176,10 @@ class TorrentRow(QWidget):
         palette = self.palette()
 
         metrics = QFontMetrics(self.title_label.font())
-        self.title_label.setText(
-            metrics.elidedText(t["name"], Qt.ElideRight, self._text_width))
+        # Shortened from the end but keeping the file extension — the end of
+        # a release name is the least informative part, except for ".mkv".
+        self.title_label.setText(truncate_name(
+            t["name"], lambda s: metrics.horizontalAdvance(s) <= self._text_width))
         self.title_label.setToolTip(t["name"])
 
         frac = (t.get("metadataPercentComplete", 0) if state == "magnetizing"

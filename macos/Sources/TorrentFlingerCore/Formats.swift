@@ -156,6 +156,71 @@ public enum Format: Sendable {
         return name.isEmpty ? link : name
     }
 
+    // MARK: Name truncation
+
+    /// File extensions worth keeping visible when a name is shortened. An
+    /// allowlist rather than "whatever follows the last period", so
+    /// `filename.otherinfo` isn't mistaken for a file and `[YTS.MX]` isn't an
+    /// extension `MX]`. Lower-case; matching is case-insensitive. Mirrored in
+    /// the Python core (`KNOWN_EXTENSIONS`) — keep the two lists identical.
+    public static let knownExtensions: Set<String> = [
+        // video
+        "mkv", "mp4", "m4v", "avi", "mov", "wmv", "mpg", "mpeg", "ts", "m2ts", "webm",
+        "flv", "vob", "ogv", "3gp", "divx",
+        // audio
+        "mp3", "flac", "aac", "m4a", "m4b", "ogg", "opus", "wav", "wma", "ape", "alac",
+        "aiff", "dsf",
+        // images
+        "jpg", "jpeg", "png", "gif", "webp", "heic", "bmp", "tif", "tiff", "svg",
+        // documents and books
+        "pdf", "epub", "mobi", "azw", "azw3", "cbr", "cbz", "djvu", "txt", "doc",
+        "docx", "rtf",
+        // archives and disk images
+        "zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "xz", "zst", "iso", "img",
+        "dmg", "pkg", "exe", "msi", "apk", "deb", "rpm", "appimage", "bin",
+        // subtitles and torrent-adjacent
+        "srt", "sub", "idx", "ass", "ssa", "vtt", "nfo", "sfv", "par2", "cue", "torrent",
+    ]
+
+    /// Split a torrent name into stem and trailing file extension (`".mkv"`),
+    /// so the list can keep the extension visible when it shortens the name.
+    /// Only `knownExtensions` count, and the stem must be non-empty; otherwise
+    /// `(name, "")`.
+    public static func splitExtension(_ name: String) -> (stem: String, ext: String) {
+        guard let dot = name.lastIndex(of: "."), dot != name.startIndex else { return (name, "") }
+        let ext = name[name.index(after: dot)...]
+        guard knownExtensions.contains(ext.lowercased()) else { return (name, "") }
+        return (String(name[..<dot]), String(name[dot...]))
+    }
+
+    /// Shorten `name` from the end while keeping its extension:
+    /// `Reacher.S04E05.1080p.WEB-DL.mkv` becomes `Reacher.S04E05.1080p…mkv`.
+    ///
+    /// `fits` is the caller's measurement — points on screen, characters in a
+    /// test — and must be monotone (if a string fits, so does every prefix of
+    /// it). The ellipsis replaces the extension's period so the break reads
+    /// as one mark; trailing spaces and periods on the kept stem are dropped
+    /// for the same reason. Returns the name untouched when it fits, and the
+    /// bare `…ext` tail when nothing does.
+    public static func truncateName(_ name: String, fits: (String) -> Bool) -> String {
+        if fits(name) { return name }
+        let (stem, ext) = splitExtension(name)
+        let tail = "…" + ext.dropFirst()
+        let characters = Array(stem)
+        func candidate(_ n: Int) -> String {
+            var kept = characters[..<n]
+            while let last = kept.last, last == " " || last == "." { kept.removeLast() }
+            return String(kept) + tail
+        }
+        var lo = 0
+        var hi = characters.count
+        while lo < hi {
+            let mid = (lo + hi + 1) / 2
+            if fits(candidate(mid)) { lo = mid } else { hi = mid - 1 }
+        }
+        return candidate(lo)
+    }
+
     // MARK: Helpers
 
     private static func trimTrailingSlashes(_ s: String) -> String {

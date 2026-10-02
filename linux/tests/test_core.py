@@ -20,7 +20,8 @@ CONFIG_DIR = tempfile.mkdtemp(prefix="flinger-config-")
 os.environ["TORRENT_FLINGER_CONFIG_DIR"] = CONFIG_DIR
 
 from flinger.core.config import Config
-from flinger.core.formats import fmt_eta, fmt_size, fmt_speed, link_display_name
+from flinger.core.formats import (fmt_eta, fmt_size, fmt_speed, link_display_name,
+                                  split_extension, truncate_name)
 from flinger.core.transmission import AuthFailed, TransmissionClient
 
 SESSION_ID = "test-session-id"
@@ -293,6 +294,36 @@ class TestFormats(unittest.TestCase):
     def test_link_names(self):
         self.assertEqual(link_display_name("magnet:?xt=urn:btih:x&dn=My+File"), "My File")
         self.assertEqual(link_display_name("/tmp/some%20file.torrent"), "some file.torrent")
+
+    def test_split_extension(self):
+        self.assertEqual(split_extension("Reacher.S04E05.1080p.WEB-DL.mkv"),
+                         ("Reacher.S04E05.1080p.WEB-DL", ".mkv"))
+        self.assertEqual(split_extension("archive.7z"), ("archive", ".7z"))
+        self.assertEqual(split_extension("album.FLAC"), ("album", ".FLAC"))
+        self.assertEqual(split_extension("Movie.MKV"), ("Movie", ".MKV"))   # case-insensitive
+        # not extensions: unknown suffixes, brackets, a resolution, no period, a dotfile
+        self.assertEqual(split_extension("filename.otherinfo"), ("filename.otherinfo", ""))
+        self.assertEqual(split_extension("The Apprentice (2024) [YTS.MX]"),
+                         ("The Apprentice (2024) [YTS.MX]", ""))
+        self.assertEqual(split_extension("Show.S01.1080p.WEB-DL"), ("Show.S01.1080p.WEB-DL", ""))
+        self.assertEqual(split_extension("Movie.2024.1080p"), ("Movie.2024.1080p", ""))
+        self.assertEqual(split_extension("Season 1"), ("Season 1", ""))
+        self.assertEqual(split_extension(".mkv"), (".mkv", ""))
+
+    def test_truncate_name(self):
+        def within(limit):
+            return lambda s: len(s) <= limit
+        # fits → untouched
+        self.assertEqual(truncate_name("Short.mkv", within(20)), "Short.mkv")
+        # the extension survives; the ellipsis takes the place of its period
+        self.assertEqual(truncate_name("Reacher.S04E05.Bridge.mkv", within(12)), "Reacher…mkv")
+        # the kept stem never ends in a period or a space
+        self.assertEqual(truncate_name("Some Long Folder Name", within(10)), "Some Long…")
+        self.assertEqual(truncate_name("Some Long Folder Name", within(11)), "Some Long…")
+        # the longest prefix that fits is used, not merely one that does
+        self.assertEqual(truncate_name("abcdefghij.mp4", within(8)), "abcd…mp4")
+        # nothing fits → the bare tail, rather than nothing at all
+        self.assertEqual(truncate_name("abcdefghij.mp4", within(2)), "…mp4")
 
 
 class TestTVDetect(unittest.TestCase):

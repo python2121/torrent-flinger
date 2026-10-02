@@ -46,7 +46,7 @@ Pure stdlib. Every module here has a Swift counterpart under
 |---|---|
 | `transmission.py` | The RPC client. Blocking `urllib`, 409 handshake, Basic auth, opt-out TLS verification, `TORRENT_FIELDS`/`DETAIL_FIELDS`, `TransmissionError`/`ConnectionFailed`/`AuthFailed`. See [rpc.md](rpc.md). |
 | `config.py` | The `Config` dataclass, platform config paths, lenient load, 0600 save. See [config.md](config.md). |
-| `formats.py` | `fmt_size`, `fmt_speed` (SI, 1000-based), `fmt_eta`, `status_name`, `fmt_date`, `map_remote_path`, `common_remote_root`, `resolve_local_path`, `link_display_name`. |
+| `formats.py` | `split_extension` / `truncate_name` (shorten a name from the end, keeping a known file extension — `…mkv`; mirrored in Swift), `fmt_size`, `fmt_speed` (SI, 1000-based), `fmt_eta`, `status_name`, `fmt_date`, `map_remote_path`, `common_remote_root`, `resolve_local_path`, `link_display_name`. |
 | `tvdetect.py` | `looks_like_tv(name)` → `(bool, reason)` on `S01E02`, `1x02`, air dates and season packs; `find_tv_dir(custom_dirs)` returns the first directory flagged `tv`. |
 | `trayicon.py` | `tray_icon(connected, download_speed, recently_added)` → one of four state names, and `ADDED_DURATION_S = 3.0`. The precedence rule is duplicated in Swift with a test on both sides asserting the same 3 s. |
 | `polling.py` | `poll_interval_ms(configured, visible, active, slow_when_idle)` and `any_active(torrents)` — the popup's refresh cadence, including the 10 s idle back-off. Both back-offs are floors: neither polls faster than the configured interval. The one module here with **no** Swift counterpart file, though `TorrentStore.pollInterval` duplicates the closed-panel floor inline; only the idle slow-down is Linux-only. |

@@ -127,6 +127,40 @@ enum FormatTests {
             t.equal(Format.linkDisplayName("magnet:"), "(magnet link)")
         },
 
+        TestEntry("format/split-extension") { t in
+            func check(_ name: String, _ stem: String, _ ext: String) {
+                let split = Format.splitExtension(name)
+                t.equal(split.stem, stem, name)
+                t.equal(split.ext, ext, name)
+            }
+            check("Reacher.S04E05.1080p.WEB-DL.mkv", "Reacher.S04E05.1080p.WEB-DL", ".mkv")
+            check("archive.7z", "archive", ".7z")
+            check("album.FLAC", "album", ".FLAC")
+            check("Movie.MKV", "Movie", ".MKV")                     // case-insensitive
+            // not extensions: unknown suffixes, brackets, a resolution, no period, a dotfile
+            check("filename.otherinfo", "filename.otherinfo", "")
+            check("The Apprentice (2024) [YTS.MX]", "The Apprentice (2024) [YTS.MX]", "")
+            check("Show.S01.1080p.WEB-DL", "Show.S01.1080p.WEB-DL", "")
+            check("Movie.2024.1080p", "Movie.2024.1080p", "")
+            check("Season 1", "Season 1", "")
+            check(".mkv", ".mkv", "")
+        },
+
+        TestEntry("format/truncate-name") { t in
+            func within(_ limit: Int) -> (String) -> Bool { { $0.count <= limit } }
+            // fits → untouched
+            t.equal(Format.truncateName("Short.mkv", fits: within(20)), "Short.mkv")
+            // the extension survives; the ellipsis takes the place of its period
+            t.equal(Format.truncateName("Reacher.S04E05.Bridge.mkv", fits: within(12)), "Reacher…mkv")
+            // the kept stem never ends in a period or a space
+            t.equal(Format.truncateName("Some Long Folder Name", fits: within(10)), "Some Long…")
+            t.equal(Format.truncateName("Some Long Folder Name", fits: within(11)), "Some Long…")
+            // the longest prefix that fits is used, not merely one that does
+            t.equal(Format.truncateName("abcdefghij.mp4", fits: within(8)), "abcd…mp4")
+            // nothing fits → the bare tail, rather than nothing at all
+            t.equal(Format.truncateName("abcdefghij.mp4", fits: within(2)), "…mp4")
+        },
+
         TestEntry("tvdetect/positives") { t in
             let cases: [(String, TVDetect.Reason)] = [
                 // Episode markers — the workhorse signal.
