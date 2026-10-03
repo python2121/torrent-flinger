@@ -19,6 +19,8 @@ struct SettingsView: View {
     @State private var testResult = ""
     @State private var testing = false
     @State private var showingAddDir = false
+    /// The folder whose edit sheet is up.
+    @State private var editingDir: CustomDir?
     @State private var showingImporter = false
 
     var body: some View {
@@ -59,10 +61,17 @@ struct SettingsView: View {
             if mode == .setup, !store.hasConfig { draft.host = "" }
         }
         .sheet(isPresented: $showingAddDir) {
-            AddDirectorySheet { label, dir, tv in
+            FolderSheet { label, dir, tv in
                 guard let entry = CustomDir.make(label: label, dir: dir, tv: tv) else { return }
                 draft.customDirs.append(entry)
                 if tv { draft.customDirs = CustomDir.markingTV(entry.dir, in: draft.customDirs) }
+            }
+        }
+        .sheet(item: $editingDir) { entry in
+            FolderSheet(existing: entry) { label, dir, tv in
+                replace(entry, label: label, dir: dir, tv: tv)
+            } onRemove: {
+                draft.customDirs.removeAll { $0.id == entry.id }
             }
         }
         .fileImporter(isPresented: $showingImporter, allowedContentTypes: [.json, .data]) { result in
@@ -192,19 +201,32 @@ struct SettingsView: View {
     private var directoriesSection: some View {
         Section {
             ForEach(draft.customDirs) { entry in
-                HStack(spacing: 12) {
-                    Image(systemName: entry.tv ? "tv" : "folder")
-                        .foregroundStyle(entry.tv ? Color.accentColor : Color.secondary)
-                        .frame(width: 24)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(entry.displayLabel)
-                        Text(entry.dir)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
+                // Tap to edit; the chevron says so. Swipe and long-press keep
+                // the shortcuts for the TV flag and removal.
+                Button {
+                    editingDir = entry
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: entry.tv ? "tv" : "folder")
+                            .foregroundStyle(entry.tv ? Color.accentColor : Color.secondary)
+                            .frame(width: 24)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(entry.displayLabel)
+                                .foregroundStyle(.primary)
+                            Text(entry.dir)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                        Spacer(minLength: 8)
+                        Image(systemName: "chevron.right")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.tertiary)
                     }
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
                 .swipeActions(edge: .leading) {
                     Button(entry.tv ? "Not TV" : "TV folder", systemImage: "tv") {
                         draft.customDirs = CustomDir.markingTV(entry.tv ? nil : entry.dir, in: draft.customDirs)
@@ -225,7 +247,7 @@ struct SettingsView: View {
         } header: {
             Text("Download folders")
         } footer: {
-            Text("Offered as destinations when adding. Flag one as the TV folder (swipe right) and torrents whose names look like TV shows suggest it automatically.")
+            Text("Offered as destinations when adding. Tap a folder to edit it. Flag one as the TV folder and torrents whose names look like TV shows suggest it automatically.")
         }
     }
 
@@ -274,11 +296,22 @@ struct SettingsView: View {
         return config
     }
 
+    /// Apply an edit sheet's result to one folder, keeping the TV flag
+    /// exclusive when it was switched on.
+    private func replace(_ entry: CustomDir, label: String, dir: String, tv: Bool) {
+        guard let updated = CustomDir.make(label: label, dir: dir, tv: tv),
+              let index = draft.customDirs.firstIndex(where: { $0.id == entry.id })
+        else { return }
+        draft.customDirs[index] = updated
+        if tv { draft.customDirs = CustomDir.markingTV(updated.dir, in: draft.customDirs) }
+    }
+
     private func save() {
         let config = normalized(draft)
         draft = config
         store.save(config)
-        if mode == .settings { store.show(.init(title: "Settings saved")) }
+        // No toast: Save greying out as the draft matches the saved config
+        // is the confirmation.
     }
 
     private func testConnection() async {
@@ -311,14 +344,30 @@ struct SettingsView: View {
     }
 }
 
-/// Add a server-side download folder.
-struct AddDirectorySheet: View {
+/// Add or edit a server-side download folder. Editing prefills the fields
+/// and offers Remove; adding starts blank.
+struct FolderSheet: View {
+    var existing: CustomDir?
     var onSave: (String, String, Bool) -> Void
+    var onRemove: (() -> Void)?
     @Environment(\.dismiss) private var dismiss
 
-    @State private var label = ""
-    @State private var dir = ""
-    @State private var tv = false
+    @State private var label: String
+    @State private var dir: String
+    @State private var tv: Bool
+
+    init(existing: CustomDir? = nil,
+         onSave: @escaping (String, String, Bool) -> Void,
+         onRemove: (() -> Void)? = nil) {
+        self.existing = existing
+        self.onSave = onSave
+        self.onRemove = onRemove
+        _label = State(initialValue: existing?.label ?? "")
+        _dir = State(initialValue: existing?.dir ?? "")
+        _tv = State(initialValue: existing?.tv ?? false)
+    }
+
+    private var isEditing: Bool { existing != nil }
 
     var body: some View {
         NavigationStack {
@@ -337,13 +386,22 @@ struct AddDirectorySheet: View {
                 } footer: {
                     Text("Suggested automatically for torrents whose names look like TV shows.")
                 }
+                if isEditing, let onRemove {
+                    Section {
+                        Button("Remove Folder", role: .destructive) {
+                            onRemove()
+                            dismiss()
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                }
             }
-            .navigationTitle("Add Folder")
+            .navigationTitle(isEditing ? "Edit Folder" : "Add Folder")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") {
+                    Button(isEditing ? "Save" : "Add") {
                         onSave(label, dir, tv)
                         dismiss()
                     }

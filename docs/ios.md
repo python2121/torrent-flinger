@@ -44,7 +44,7 @@ in `Info.plist`.
 | Details window: Info / Files / Peers / Trackers / Options | `TorrentDetailView` | A segmented control over five lists. The Files tab is `List(children:)` over the same `FileNode.tree`, with the folder-level checkbox and a long-press menu for priority. |
 | Details action bar | Toolbar menu | Pause/Resume, Verify, Reannounce, Set location (a sheet), Copy / Share magnet, Remove. |
 | Add dialog | `AddTorrentSheet` | Server default + custom folders as an inline picker, free space for the choice, TV detection pre-selecting the flagged folder with its reason, add-paused. |
-| Options: Server / General / Download tabs | `SettingsView` | One Form. Draft + Save so typing a host doesn't rebuild the client per keystroke. Also the first-run screen. |
+| Options: Server / General / Download tabs | `SettingsView` | One Form. Draft + Save so typing a host doesn't rebuild the client per keystroke. Download folders are tapped to edit (one add-or-edit sheet, `FolderSheet`, with Remove when editing). Also the first-run screen. |
 | Options: Limits tab | `LimitsView` | Same `session-get` keys, disabled until loaded, Apply writes `session-set`. |
 | Statistics window | `StatsView` | Plus the live figures (speeds, counts, free space, server version). |
 | Start all / Pause all / web UI | List toolbar menu | Web UI opens in Safari. The same menu pushes Statistics and Settings — there is no tab bar; the list is the whole root. |
