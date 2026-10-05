@@ -128,7 +128,7 @@ The suite is in the executable target and reaches the library with
 `@testable import TorrentFlingerCore` (SwiftPM debug builds enable
 testability; the release build never compiles the suite).
 
-Current coverage: 97 cases / 468 checks over formatting, path mapping, TV
+Current coverage: 98 cases / 471 checks over formatting, path mapping, TV
 detection, config load/save, torrent state classification, list grouping +
 search, selection arithmetic, custom-directory rules, the Files tab's directory
 tree (`FileNode.tree`), the menu bar's speed smoothing (`SpeedAverager` — pure

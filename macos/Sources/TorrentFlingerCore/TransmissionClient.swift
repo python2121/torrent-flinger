@@ -48,13 +48,13 @@ public actor TransmissionClient {
         "rateDownload", "rateUpload", "totalSize", "downloadedEver",
         "uploadedEver", "uploadRatio", "eta", "peersConnected",
         "peersSendingToUs", "peersGettingFromUs", "isFinished", "error",
-        "errorString", "addedDate", "queuePosition", "sizeWhenDone",
+        "errorString", "addedDate", "doneDate", "queuePosition", "sizeWhenDone",
         "leftUntilDone", "magnetLink", "downloadDir",
     ]
 
     /// Extra fields fetched only for the details view of a single torrent.
     public static let detailFields: [String] = torrentFields + [
-        "hashString", "comment", "creator", "dateCreated", "doneDate",
+        "hashString", "comment", "creator", "dateCreated",
         "activityDate", "pieceCount", "pieceSize", "isPrivate", "haveValid",
         "haveUnchecked", "corruptEver", "desiredAvailable",
         "secondsDownloading", "secondsSeeding", "seedRatioLimit",

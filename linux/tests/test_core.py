@@ -20,8 +20,8 @@ CONFIG_DIR = tempfile.mkdtemp(prefix="flinger-config-")
 os.environ["TORRENT_FLINGER_CONFIG_DIR"] = CONFIG_DIR
 
 from flinger.core.config import Config
-from flinger.core.formats import (fmt_eta, fmt_size, fmt_speed, link_display_name,
-                                  split_extension, truncate_name)
+from flinger.core.formats import (completion_time, fmt_eta, fmt_size, fmt_speed,
+                                  link_display_name, split_extension, truncate_name)
 from flinger.core.transmission import AuthFailed, TransmissionClient
 
 SESSION_ID = "test-session-id"
@@ -294,6 +294,14 @@ class TestFormats(unittest.TestCase):
     def test_link_names(self):
         self.assertEqual(link_display_name("magnet:?xt=urn:btih:x&dn=My+File"), "My File")
         self.assertEqual(link_display_name("/tmp/some%20file.torrent"), "some file.torrent")
+
+    def test_completion_time(self):
+        self.assertEqual(completion_time({"doneDate": 500, "addedDate": 100}), 500)
+        # already complete when added (doneDate 0) → when it arrived
+        self.assertEqual(completion_time({"doneDate": 0, "addedDate": 100}), 100)
+        # a server that doesn't send doneDate at all
+        self.assertEqual(completion_time({"addedDate": 100}), 100)
+        self.assertEqual(completion_time({}), 0)
 
     def test_split_extension(self):
         self.assertEqual(split_extension("Reacher.S04E05.1080p.WEB-DL.mkv"),

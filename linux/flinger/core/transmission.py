@@ -42,6 +42,7 @@ TORRENT_FIELDS = [
     "error",
     "errorString",
     "addedDate",
+    "doneDate",
     "queuePosition",
     "sizeWhenDone",
     "leftUntilDone",

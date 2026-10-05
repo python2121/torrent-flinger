@@ -13,13 +13,16 @@ enum UILogicTests {
     private static func torrent(_ id: Int, _ name: String,
                                 status: Int = TorrentStatus.downloading,
                                 percentDone: Double = 0.5,
-                                error: String = "") -> Torrent {
+                                error: String = "",
+                                addedDate: Int = 0, doneDate: Int? = nil) -> Torrent {
         var t = Torrent()
         t.id = id
         t.name = name
         t.status = status
         t.percentDone = percentDone
         t.errorString = error
+        t.addedDate = addedDate
+        t.doneDate = doneDate
         return t
     }
 
@@ -67,6 +70,27 @@ enum UILogicTests {
             // popover must not re-sort inside a section.
             let torrents = [torrent(7, "seven"), torrent(3, "three"), torrent(9, "nine")]
             t.equal(Torrent.grouped(torrents).first?.torrents.map(\.id), [7, 3, 9])
+        },
+
+        TestEntry("grouping/finished-sorts-newest-first") { t in
+            let done = TorrentStatus.stopped
+            let torrents = [
+                torrent(1, "old", status: done, percentDone: 1, addedDate: 500, doneDate: 1_000),
+                torrent(2, "newest", status: done, percentDone: 1, addedDate: 500, doneDate: 3_000),
+                // already complete when added: doneDate 0 → falls back to addedDate
+                torrent(3, "added complete", status: done, percentDone: 1, addedDate: 2_000, doneDate: 0),
+                // a server that never sends doneDate
+                torrent(4, "no done date", status: done, percentDone: 1, addedDate: 2_500),
+                torrent(5, "still downloading", addedDate: 9_000),
+            ]
+            let groups = Torrent.grouped(torrents)
+            t.equal(groups.map(\.name), ["Downloading", "Finished"])
+            t.equal(groups.last?.torrents.map(\.id), [2, 4, 3, 1],
+                    "newest completion first, with addedDate standing in for a missing doneDate")
+            // Equal times keep server order (stable).
+            let tied = [torrent(8, "a", status: done, percentDone: 1, doneDate: 7),
+                        torrent(6, "b", status: done, percentDone: 1, doneDate: 7)]
+            t.equal(Torrent.grouped(tied).first?.torrents.map(\.id), [8, 6])
         },
 
         TestEntry("grouping/search-is-case-and-space-insensitive") { t in

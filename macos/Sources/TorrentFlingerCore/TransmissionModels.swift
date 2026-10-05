@@ -161,8 +161,10 @@ public struct Torrent: Codable, Identifiable, Equatable, Sendable {
     public static let groupOrder = ["Error", "Downloading", "Verifying", "Seeding", "Paused", "Finished"]
 
     /// Apply the search filter, then bucket by status into `groupOrder`,
-    /// preserving server order within a group and omitting groups that end up
-    /// empty. Pure, so the popover's list content can be tested without a store.
+    /// preserving server order within a group (queue position is meaningful)
+    /// — except Finished, which reads best newest first — and omitting groups
+    /// that end up empty. Pure, so the popover's list content can be tested
+    /// without a store.
     public static func grouped(_ torrents: [Torrent],
                         matching search: String = "") -> [(name: String, torrents: [Torrent])] {
         let needle = search.trimmingCharacters(in: .whitespaces).lowercased()
@@ -171,7 +173,24 @@ public struct Torrent: Codable, Identifiable, Equatable, Sendable {
             : torrents.filter { $0.name.lowercased().contains(needle) }
         var buckets: [String: [Torrent]] = [:]
         for torrent in visible { buckets[torrent.group, default: []].append(torrent) }
+        if let finished = buckets["Finished"] {
+            // Stable, so two torrents finishing in the same second keep server order.
+            buckets["Finished"] = finished.enumerated()
+                .sorted { ($0.element.completionTime, $1.offset) > ($1.element.completionTime, $0.offset) }
+                .map(\.element)
+        }
         return groupOrder.compactMap { name in buckets[name].map { (name, $0) } }
+    }
+
+    /// When the torrent finished, for sorting the Finished group newest
+    /// first. Transmission reports `doneDate` as 0 for a torrent that was
+    /// already complete when it was added, and some reimplementations omit
+    /// it, so those fall back to `addedDate` — when it arrived — rather than
+    /// all sinking to the bottom in an arbitrary order. Mirrored in the
+    /// Python core (`completion_time`).
+    public var completionTime: Int {
+        if let done = doneDate, done > 0 { return done }
+        return addedDate
     }
 
     public var state: State {

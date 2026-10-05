@@ -82,6 +82,19 @@ class PopupTest(unittest.TestCase):
         self.assertIn("42.0 GB free", popup.footer_stats.text())
         self.assertIn("Connected", popup.status_label.text())
 
+    def test_finished_sorted_newest_first(self):
+        from flinger.ui.popup import Popup
+        popup = Popup()
+        popup.set_data([
+            _torrent(1, "old.iso", 0, 1.0, doneDate=1_000),
+            _torrent(2, "newest.iso", 0, 1.0, doneDate=3_000),
+            _torrent(3, "added-complete.iso", 0, 1.0, doneDate=0, addedDate=2_000),
+            _torrent(4, "still-downloading.iso", 4, 0.5),
+        ], {"downloadSpeed": 0, "uploadSpeed": 0}, free_space=0, server="nas")
+        finished = dict(popup._grouped())["Finished"]
+        # newest completion first; a zero doneDate falls back to addedDate
+        self.assertEqual([r.torrent_id for r in finished], [2, 3, 1])
+
     def test_filter(self):
         popup, _ = self.make_popup()
         popup.search.setText("fedora")

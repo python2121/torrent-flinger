@@ -175,6 +175,18 @@ def truncate_name(name: str, fits) -> str:
     return candidate(lo)
 
 
+def completion_time(torrent: dict) -> int:
+    """When a torrent finished, for sorting the Finished group newest first.
+
+    Transmission reports ``doneDate`` as 0 for a torrent that was already
+    complete when it was added, and some reimplementations omit it, so those
+    fall back to ``addedDate`` — when it arrived — rather than all sinking to
+    the bottom in an arbitrary order. Mirrored in the Swift core
+    (``Torrent.completionTime``).
+    """
+    return torrent.get("doneDate") or torrent.get("addedDate") or 0
+
+
 def link_display_name(link: str) -> str:
     """Best-effort human name for a magnet URI or .torrent path."""
     if link.startswith("magnet:"):

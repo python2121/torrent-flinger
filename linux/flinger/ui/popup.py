@@ -22,7 +22,8 @@ from PySide6.QtWidgets import (
 )
 
 from ..core import transmission as tr
-from ..core.formats import fmt_size, fmt_speed, link_display_name, resolve_local_path
+from ..core.formats import (completion_time, fmt_size, fmt_speed, link_display_name,
+                            resolve_local_path)
 from .style import NEGATIVE, POSITIVE, argb, build_stylesheet, small_font
 from .torrent_row import TorrentRow
 
@@ -323,6 +324,10 @@ class Popup(QWidget):
         groups: dict[str, list[TorrentRow]] = {}
         for row in self._rows.values():
             groups.setdefault(row.group, []).append(row)
+        # Server order within a group (queue position is meaningful) — except
+        # Finished, which reads best newest first.
+        if "Finished" in groups:
+            groups["Finished"].sort(key=lambda r: completion_time(r.torrent()), reverse=True)
         return [(g, groups[g]) for g in GROUP_ORDER if g in groups]
 
     def _relayout(self):

@@ -236,7 +236,11 @@ items with a POSIX file lock.
   freshly opened. `TorrentFlingerCore/Selection.swift`, `TorrentStore.swift`
 - **Grouping and search** — `Torrent.grouped(_:matching:)` applies the
   case-insensitive substring filter, buckets by status into `groupOrder`,
-  preserves server order within a group (queue position is meaningful) and
+  preserves server order within a group (queue position is meaningful) —
+  except Finished, sorted newest completion first via `Torrent.completionTime`
+  (`doneDate`, falling back to `addedDate` for a torrent that was already
+  complete when added or a server that doesn't send it; the Linux build
+  applies the identical `completion_time`) — and
   omits empty groups so no bare header renders. Pure, so the popover's list
   content is testable without a store. `TorrentFlingerCore/TransmissionModels.swift`
 - **Actions** — start/stop (single, batch, and all), remove (with optional data
@@ -404,7 +408,7 @@ items with a POSIX file lock.
   `URLProtocol` reproducing the 409 handshake, 0/1 `wanted`, and kebab-case
   `peer-limit` — plus `FailingTransport`, which pins the URLSession-error
   mapping (notably that -1009 becomes the actionable local-network message and
-  that other transport errors don't). 97 cases / 468 checks. The whole
+  that other transport errors don't). 98 cases / 471 checks. The whole
   directory is `#if DEBUG`, dispatched by `--self-test` before `NSApplication`,
   so release builds contain none of it; it reaches the library with
   `@testable import TorrentFlingerCore`.
