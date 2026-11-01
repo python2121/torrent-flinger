@@ -267,11 +267,11 @@ class TorrentRow(QWidget):
     def matches(self, text: str) -> bool:
         return not text or text.lower() in self._t.get("name", "").lower()
 
-    @property
     def torrent(self) -> dict:
         """The torrent as last handed to ``update_torrent``."""
         return self._t
 
+    @property
     def group(self) -> str:
         state = torrent_state(self._t)
         return {"downloading": "Downloading", "magnetizing": "Downloading",
