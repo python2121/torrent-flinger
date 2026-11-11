@@ -202,7 +202,7 @@ struct TorrentRowView: View {
             rowAction("Details…") { actions.showDetails(torrent.id) }
             rowAction("Copy magnet link") { store.copyMagnets(for: [torrent.id]) }
             if store.canReveal(torrent.id) {
-                rowAction("Reveal in Finder") { store.revealInFinder(torrent.id) }
+                rowAction("Reveal in Finder") { actions.revealInFinder(torrent.id) }
             }
             rowAction("Remove torrent…") { confirmRemove([torrent.id]) }
             Divider().padding(.vertical, 4)
@@ -289,7 +289,7 @@ struct TorrentRowView: View {
         if ids.count == 1 {
             Divider()
             if store.canReveal(ids[0]) {
-                Button("Reveal in Finder") { store.revealInFinder(ids[0]) }
+                Button("Reveal in Finder") { actions.revealInFinder(ids[0]) }
             }
             Button("Torrent files…") { actions.showFiles(ids[0]) }
             Button("Details…") { actions.showDetails(ids[0]) }

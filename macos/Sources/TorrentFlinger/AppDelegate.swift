@@ -203,6 +203,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         stats.show()
     }
 
+    func revealInFinder(_ torrentID: Int) {
+        closePanel()
+        store.revealInFinder(torrentID)
+    }
+
     /// One details window per torrent, reused while it stays open. A nil `tab`
     /// leaves the tab alone — a second Details… shouldn't yank an open window
     /// back to Info, but "Torrent files…" should always land on Files.
@@ -232,6 +237,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 addLink: { [weak self] link in self?.handleLink(link) },
                 showDetails: { [weak self] id in self?.showDetails(id) },
                 showFiles: { [weak self] id in self?.showDetails(id, tab: .files) },
+                revealInFinder: { [weak self] id in self?.revealInFinder(id) },
                 showOptions: { [weak self] in self?.showOptions() },
                 showStats: { [weak self] in self?.showStats() },
                 quit: { NSApp.terminate(nil) }
